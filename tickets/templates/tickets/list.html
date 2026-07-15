@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Tickets{% endblock %}
+{% block content %}
+<h1>Tickets</h1>
+<form method="get" style="margin-bottom:12px">
+  <input type="search" name="q" placeholder="Search…" value="{{ request.GET.q }}">
+  <button>Search</button>
+</form>
+<nav class="filters">
+  <a href="?">All</a>
+  {% for value, label in status_choices %}
+    <a href="?status={{ value }}"{% if current_status == value %} style="font-weight:bold"{% endif %}>{{ label }}</a>
+  {% endfor %}
+  <a href="?mine=1">Assigned to me</a>
+</nav>
+<table>
+  <tr><th>#</th><th>Subject</th><th>Status</th><th>Priority</th><th>Reporter</th><th>Assignee</th><th>Updated</th></tr>
+  {% for t in tickets %}
+  <tr>
+    <td>{{ t.pk }}</td>
+    <td><a href="{% url 'ticket_detail' t.pk %}">{{ t.subject }}</a></td>
+    <td><span class="badge {{ t.status }}">{{ t.get_status_display }}</span></td>
+    <td class="{{ t.priority }}">{{ t.get_priority_display }}</td>
+    <td>{{ t.reporter.username }}</td>
+    <td>{{ t.assignee.username|default:"—" }}</td>
+    <td>{{ t.updated_at|date:"M d, H:i" }}</td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="7">No tickets.</td></tr>
+  {% endfor %}
+</table>
+{% endblock %}

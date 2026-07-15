@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Request received{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>✅ Thanks!</h1>
+  <p>Your request <strong>#{{ ticket.pk }}</strong> — “{{ ticket.subject }}” — has been received.
+     We'll email you at updates.</p>
+  <p><a href="{% url 'submit_ticket' %}">Submit another</a></p>
+</div>
+{% endblock %}

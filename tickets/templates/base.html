@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ brand_name }}{% endblock %}</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; color: #1a1a1a; }
+    header { background: {{ brand_color }}; color: #fff; padding: 12px 20px; display: flex; gap: 16px; align-items: center; }
+    header a { color: #fff; text-decoration: none; }
+    main { max-width: 900px; margin: 24px auto; padding: 0 16px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #eee; }
+    .badge { padding: 2px 8px; border-radius: 10px; font-size: 12px; color: #fff; }
+    .open { background: {{ brand_accent }}; } .pending { background: #d97706; }
+    .resolved { background: #16a34a; } .closed { background: #6b7280; }
+    .low { color: #6b7280; } .normal { color: #1a1a1a; }
+    .high { color: #d97706; } .urgent { color: #dc2626; font-weight: bold; }
+    input, textarea, select { padding: 6px; font: inherit; }
+    button { padding: 8px 14px; background: {{ brand_accent }}; color: #fff; border: 0; border-radius: 6px; cursor: pointer; }
+    .comment { border-left: 3px solid #ddd; padding: 6px 12px; margin: 10px 0; }
+    .comment.internal { border-color: #d97706; background: #fffbeb; }
+    .card { border: 1px solid #eee; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+    nav.filters a { margin-right: 10px; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="{% url 'ticket_list' %}"><strong>🎫 {{ brand_name }}</strong></a>
+    {% if user.is_authenticated %}
+      <a href="{% url 'reports' %}">Reports</a>
+      <span style="margin-left:auto">{{ user.username }}</span>
+      <a href="{% url 'logout' %}">Logout</a>
+    {% endif %}
+  </header>
+  <main>{% block content %}{% endblock %}</main>
+</body>
+</html>

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}#{{ ticket.pk }} {{ ticket.subject }}{% endblock %}
+{% block content %}
+<p><a href="{% url 'ticket_list' %}">← Back</a></p>
+<div class="card">
+  <h1>#{{ ticket.pk }} {{ ticket.subject }}</h1>
+  <p><span class="badge {{ ticket.status }}">{{ ticket.get_status_display }}</span>
+     · <span class="{{ ticket.priority }}">{{ ticket.get_priority_display }}</span>
+     · reported by {{ ticket.reporter.username }} on {{ ticket.created_at|date:"M d, Y" }}</p>
+  <p style="white-space:pre-wrap">{{ ticket.body }}</p>
+</div>
+
+<div class="card">
+  <form method="post">
+    {% csrf_token %}
+    {{ uform.as_p }}
+    <button name="update">Update ticket</button>
+  </form>
+</div>
+
+<h2>Conversation</h2>
+{% for c in comments %}
+  <div class="comment {% if c.internal %}internal{% endif %}">
+    <strong>{{ c.author.username }}</strong>
+    {% if c.internal %}<em>(internal)</em>{% endif %}
+    <small>{{ c.created_at|date:"M d, H:i" }}</small>
+    <p style="white-space:pre-wrap">{{ c.body }}</p>
+  </div>
+{% empty %}
+  <p>No comments yet.</p>
+{% endfor %}
+
+<div class="card">
+  <form method="post">
+    {% csrf_token %}
+    {{ cform.as_p }}
+    <button name="add_comment">Add reply</button>
+  </form>
+</div>
+{% endblock %}
