@@ -230,8 +230,10 @@ docker compose exec web python manage.py createsuperuser
 
 - `web` runs `migrate` then gunicorn; static served by whitenoise (no separate static host).
 - `db` is health-gated — `web` waits for Postgres to be ready.
+- Postgres and uploaded media (logos + attachments) each persist on a named volume across rebuilds.
 - **Put a reverse proxy with TLS in front** (port 8000 is plain HTTP). When `DEBUG=False`, the app enables HTTPS redirect, secure cookies, and HSTS, and trusts `X-Forwarded-Proto` from the proxy.
-- Uploaded logos live in `MEDIA_ROOT` — mount it as a volume (or use S3) so they survive redeploys.
+
+**👉 Full step-by-step production guide: [DEPLOYMENT.md](DEPLOYMENT.md)** — reverse-proxy configs (Caddy/nginx), TLS, cron jobs, SSO callback setup, backups, updates, and troubleshooting.
 
 ### Email-to-ticket
 Set `IMAP_*` in `.env`, then poll on a schedule:

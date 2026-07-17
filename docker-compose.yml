@@ -18,6 +18,8 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgres://helpdesk:${DB_PASSWORD:-helpdesk}@db:5432/helpdesk
+    volumes:
+      - media:/app/media   # uploaded logos & attachments survive rebuilds
     ports:
       - "8000:8000"
     depends_on:
@@ -26,3 +28,4 @@ services:
 
 volumes:
   pgdata:
+  media:
