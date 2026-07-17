@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Knowledge base{% endblock %}
+{% block body %}
+<div class="public" style="align-items:flex-start;">
+  <div class="public-card" style="max-width:720px; margin-top:40px;">
+    <div class="public-brand">
+      {% if brand_logo %}<img src="{{ brand_logo }}" alt="{{ brand_name }}" style="max-height:36px;">
+      {% else %}<strong>{{ brand_name }} · Help</strong>{% endif %}
+    </div>
+    <div class="card"><div class="bd">
+      <h1>How can we help?</h1>
+      <p class="lede">Search our guides, or <a href="{% url 'submit_ticket' %}">contact support</a>.</p>
+      <form method="get" style="margin-bottom:18px;">
+        <input type="search" name="q" placeholder="Search articles…" value="{{ query }}" style="width:100%;">
+      </form>
+      {% for a in articles %}
+      <a class="kb-item" href="{% url 'kb_detail' a.slug %}">
+        <strong>{{ a.title }}</strong>
+        {% if a.category %}<span class="tag">{{ a.category.name }}</span>{% endif %}
+        <p class="hint" style="margin:4px 0 0;">{{ a.body|striptags|truncatewords:24 }}</p>
+      </a>
+      {% empty %}
+      <div class="empty">No articles yet.</div>
+      {% endfor %}
+    </div></div>
+  </div>
+</div>
+{% endblock %}

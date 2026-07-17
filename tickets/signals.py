@@ -90,12 +90,10 @@ def on_ticket_created(sender, instance, created, **kwargs):
         if priority != instance.priority:
             instance.priority = priority
 
-    # R3: set the SLA resolution deadline from the (possibly triaged) priority.
-    from django.utils import timezone
-    from datetime import timedelta
+    # R3/H1: SLA deadline from the (possibly triaged) priority, business-hours aware.
     from .models import OrgSettings
     org = OrgSettings.load()
-    due = instance.created_at + timedelta(hours=org.sla_hours(instance.priority))
+    due = org.sla_deadline(instance.created_at, instance.priority)
 
     Ticket.objects.filter(pk=instance.pk).update(priority=instance.priority, due_at=due)
     instance.due_at = due

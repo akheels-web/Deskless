@@ -139,6 +139,11 @@
     .view-link .count { font-size: 12px; color: var(--faint); background: var(--canvas); padding: 1px 8px; border-radius: 100px; font-variant-numeric: tabular-nums; }
     .view-link.on .count { background: color-mix(in srgb, var(--accent) 12%, #fff); color: var(--accent); }
     .queue-main { min-width: 0; }
+    .bulk-bar { display: none; align-items: center; gap: 10px; padding: 10px 14px; margin-bottom: 12px;
+      background: var(--ink); color: #fff; border-radius: 6px; }
+    .bulk-bar.on { display: flex; }
+    .bulk-bar select { background: #fff; }
+    .bulk-bar #bulk-count { font-weight: 600; margin-right: auto; }
     .views-heading { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--faint);
       font-weight: 600; padding: 14px 12px 6px; }
     .tag { display: inline-block; padding: 1px 8px; border-radius: 100px; font-size: 12px;
@@ -146,6 +151,19 @@
     .attach { display: inline-flex; align-items: center; gap: 5px; padding: 6px 11px;
       border: 1px solid var(--line-strong); border-radius: var(--radius); font-size: 13px; color: var(--ink); }
     .attach:hover { border-color: var(--accent); text-decoration: none; }
+    .kb-item { display: block; padding: 14px 0; border-top: 1px solid var(--line); color: var(--ink); }
+    .kb-item:hover { text-decoration: none; }
+    .kb-item:hover strong { color: var(--accent); }
+    .kb-item:first-of-type { border-top: 0; }
+    .rate-row { display: flex; gap: 8px; justify-content: center; margin-top: 8px; }
+    .rate-star { background: none; border: 0; font-size: 38px; line-height: 1; cursor: pointer; color: var(--line-strong); padding: 0; }
+    .rate-star:hover, .rate-star.on { color: #f5a623; }
+    /* audit timeline */
+    .timeline { list-style: none; margin: 0; padding: 0; }
+    .timeline li { position: relative; padding: 0 0 12px 18px; border-left: 2px solid var(--line); }
+    .timeline li::before { content: ""; position: absolute; left: -5px; top: 4px; width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
+    .timeline li:last-child { border-left-color: transparent; }
+    .timeline .when { color: var(--faint); font-size: 12px; }
 
     /* ---- filter bar ---- */
     .filters { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 18px; }
@@ -254,6 +272,7 @@
         <a href="{% url 'team' %}" class="{% block nav_team %}{% endblock %}">Team</a>
         <a href="{% url 'org_settings' %}" class="{% block nav_settings %}{% endblock %}">Settings</a>
         {% endif %}
+        <a href="{% url 'kb_list' %}">Knowledge base</a>
         <a href="{% url 'submit_ticket' %}">Intake form</a>
       </nav>
       <div class="spacer"></div>

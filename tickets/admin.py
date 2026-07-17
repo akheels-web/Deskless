@@ -1,7 +1,7 @@
 from django.contrib import admin
 
-from .models import (Attachment, CannedReply, Category, Comment, OrgSettings,
-                     Tag, Ticket, Webhook)
+from .models import (Article, Attachment, CannedReply, Category, Comment,
+                     OrgSettings, Tag, Ticket, TicketEvent, Webhook)
 
 
 class CommentInline(admin.TabularInline):
@@ -49,3 +49,17 @@ class WebhookAdmin(admin.ModelAdmin):
 class CommentAdmin(admin.ModelAdmin):
     list_display = ("id", "ticket", "author", "internal", "created_at")
     list_filter = ("internal",)
+
+
+@admin.register(Article)
+class ArticleAdmin(admin.ModelAdmin):
+    list_display = ("title", "category", "published", "updated_at")
+    list_filter = ("published", "category")
+    search_fields = ("title", "body")
+    prepopulated_fields = {"slug": ("title",)}
+
+
+@admin.register(TicketEvent)
+class TicketEventAdmin(admin.ModelAdmin):
+    list_display = ("ticket", "description", "actor", "created_at")
+    list_filter = ("created_at",)

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Rate your support{% endblock %}
+{% block body %}
+<div class="public">
+  <div class="public-card">
+    <div class="public-brand"><strong>{{ brand_name }}</strong></div>
+    <div class="card"><div class="bd" style="text-align:center;">
+      <h1>How did we do?</h1>
+      <p class="lede">Rate the support you got for “{{ ticket.subject }}”.</p>
+      <form method="post">
+        {% csrf_token %}
+        <div class="rate-row">
+          {% for n in "12345" %}
+          <button type="submit" name="rating" value="{{ forloop.counter }}" class="rate-star" title="{{ forloop.counter }} / 5">★</button>
+          {% endfor %}
+        </div>
+        <p class="hint" style="margin-top:12px;">Tap a star to submit.</p>
+      </form>
+    </div></div>
+  </div>
+</div>
+{% endblock %}

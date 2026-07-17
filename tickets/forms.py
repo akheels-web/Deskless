@@ -71,7 +71,8 @@ class OrgSettingsForm(forms.ModelForm):
     class Meta:
         model = OrgSettings
         fields = ["name", "logo", "color", "accent",
-                  "sla_urgent", "sla_high", "sla_normal", "sla_low"]
+                  "sla_urgent", "sla_high", "sla_normal", "sla_low",
+                  "business_hours_enabled", "business_start", "business_end", "business_days"]
         widgets = {
             "color": forms.TextInput(attrs={"type": "color"}),
             "accent": forms.TextInput(attrs={"type": "color"}),

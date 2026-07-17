@@ -7,7 +7,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 
 from .forms import (AgentTicketForm, CloseTicketForm, CommentForm, LinkTicketForm,
                     NewUserForm, OrgSettingsForm, PublicTicketForm, TicketUpdateForm)
-from .models import Attachment, CannedReply, Category, OrgSettings, Ticket
+from .models import (Article, Attachment, CannedReply, Category, OrgSettings,
+                     Ticket, TicketEvent)
 from .signals import fire_webhooks
 
 
@@ -15,6 +16,12 @@ def _save_attachments(ticket, files, user):
     """G2: persist uploaded files against a ticket."""
     for f in files:
         Attachment.objects.create(ticket=ticket, file=f, uploaded_by=user)
+
+
+def log_event(ticket, actor, description):
+    """H2: append an audit-trail entry."""
+    TicketEvent.objects.create(ticket=ticket, actor=actor, description=description)
+
 
 User = get_user_model()
 admin_only = user_passes_test(lambda u: u.is_superuser)
@@ -139,16 +146,29 @@ def ticket_detail(request, pk):
                     close_form.cleaned_data["resolution"],
                     cascade=close_form.cleaned_data["cascade"],
                 )
+                log_event(ticket, request.user, "closed the ticket")
                 fire_webhooks("ticket.closed", ticket)
+                from .notifications import send_csat_request
+                send_csat_request(ticket)  # H3: ask the requester to rate
             return redirect("ticket_detail", pk=pk)
         else:  # properties update
-            prev_assignee = ticket.assignee_id
+            prev = {"status": ticket.get_status_display(),
+                    "priority": ticket.get_priority_display(),
+                    "assignee": ticket.assignee_id}
             uform = TicketUpdateForm(request.POST, instance=ticket)
             if uform.is_valid():
                 ticket = uform.save()
-                if ticket.assignee_id and ticket.assignee_id != prev_assignee:
-                    from .notifications import notify_assignment
-                    notify_assignment(ticket)  # R3: email newly-assigned agent
+                # H2: record what actually changed
+                if ticket.get_status_display() != prev["status"]:
+                    log_event(ticket, request.user, f"changed status to {ticket.get_status_display()}")
+                if ticket.get_priority_display() != prev["priority"]:
+                    log_event(ticket, request.user, f"set priority to {ticket.get_priority_display()}")
+                if ticket.assignee_id != prev["assignee"]:
+                    who = ticket.assignee.username if ticket.assignee_id else "nobody"
+                    log_event(ticket, request.user, f"assigned to {who}")
+                    if ticket.assignee_id:
+                        from .notifications import notify_assignment
+                        notify_assignment(ticket)  # R3: email newly-assigned agent
             return redirect("ticket_detail", pk=pk)
     return render(request, "tickets/detail.html", {
         "ticket": ticket, "comments": comments,
@@ -157,6 +177,7 @@ def ticket_detail(request, pk):
         "related": ticket.related.all(),
         "attachments": ticket.attachments.all(),
         "canned": CannedReply.objects.all(),
+        "events": ticket.events.select_related("actor"),
     })
 
 
@@ -173,6 +194,9 @@ def reports(request):
                     .annotate(n=Count("id")).order_by("-n"))
     status_rows = [(lbl, by_status.get(v, 0)) for v, lbl in Ticket.STATUS]
     priority_rows = [(lbl, by_priority.get(v, 0)) for v, lbl in Ticket.PRIORITY]
+    # H3: CSAT — average rating + response count over rated tickets
+    csat = qs.filter(csat_rating__isnull=False).aggregate(
+        avg=Avg("csat_rating"), n=Count("id"))
     # bar scaling maxes (avoid div-by-zero → min 1)
     return render(request, "tickets/reports.html", {
         "total": qs.count(),
@@ -184,6 +208,8 @@ def reports(request):
         "status_max": max([n for _, n in status_rows] + [1]),
         "priority_max": max([n for _, n in priority_rows] + [1]),
         "agent_max": max([r["n"] for r in by_agent] + [1]),
+        "csat_avg": round(csat["avg"], 1) if csat["avg"] else None,
+        "csat_n": csat["n"],
     })
 
 
@@ -265,3 +291,61 @@ def org_settings(request):
     else:
         form = OrgSettingsForm(instance=org)
     return render(request, "tickets/settings.html", {"form": form, "org": org})
+
+
+# ---- H4: bulk actions ----
+
+@login_required
+def ticket_bulk(request):
+    """Apply an action to many selected tickets from the queue."""
+    ids = request.POST.getlist("ids")
+    action = request.POST.get("action")
+    tickets = Ticket.objects.filter(pk__in=ids)
+    if action == "close":
+        for t in tickets.exclude(status="closed"):
+            t.close_with_resolution("Closed in bulk by an agent.", cascade=False)
+            log_event(t, request.user, "closed the ticket (bulk)")
+    elif action == "assign_me":
+        for t in tickets:
+            t.assignee = request.user
+            t.save(update_fields=["assignee"])
+            log_event(t, request.user, f"assigned to {request.user.username} (bulk)")
+    elif action and action.startswith("status:"):
+        new = action.split(":", 1)[1]
+        if new in dict(Ticket.STATUS):
+            for t in tickets:
+                t.status = new
+                t.save(update_fields=["status"])
+                log_event(t, request.user, f"changed status to {t.get_status_display()} (bulk)")
+    return redirect(request.POST.get("next") or "ticket_list")
+
+
+# ---- H3: CSAT public rating ----
+
+def rate_ticket(request, token):
+    ticket = get_object_or_404(Ticket, csat_token=token)
+    if request.method == "POST":
+        try:
+            rating = int(request.POST.get("rating", 0))
+        except ValueError:
+            rating = 0
+        if 1 <= rating <= 5:
+            ticket.csat_rating = rating
+            ticket.save(update_fields=["csat_rating"])
+            return render(request, "tickets/rated.html", {"ticket": ticket, "rating": rating})
+    return render(request, "tickets/rate.html", {"ticket": ticket})
+
+
+# ---- H5: knowledge base ----
+
+def kb_list(request):
+    articles = Article.objects.filter(published=True).select_related("category")
+    query = request.GET.get("q", "")
+    if query:
+        articles = articles.filter(Q(title__icontains=query) | Q(body__icontains=query))
+    return render(request, "tickets/kb_list.html", {"articles": articles, "query": query})
+
+
+def kb_detail(request, slug):
+    article = get_object_or_404(Article, slug=slug, published=True)
+    return render(request, "tickets/kb_detail.html", {"article": article})

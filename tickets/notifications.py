@@ -55,3 +55,26 @@ def notify_breach(ticket):
         f"{ticket.get_status_display()}.",
         recipients,
     )
+
+
+def send_csat_request(ticket):
+    """H3: email the requester a link to rate a just-closed ticket."""
+    if not (ticket.reporter.email and ticket.csat_token):
+        return
+    from django.urls import reverse
+    path = reverse("rate_ticket", args=[ticket.csat_token])
+    _send(
+        f"[Resolved · DSK-{ticket.pk:04d}] How did we do?",
+        f"Your request \"{ticket.subject}\" has been resolved.\n\n"
+        f"Rate our support (1-5): {_absolute(path)}",
+        [ticket.reporter.email],
+    )
+
+
+def _absolute(path):
+    """Best-effort absolute URL from the configured site domain."""
+    try:
+        from django.contrib.sites.models import Site
+        return f"https://{Site.objects.get_current().domain}{path}"
+    except Exception:
+        return path

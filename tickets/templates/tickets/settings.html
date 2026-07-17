@@ -37,8 +37,23 @@
         <div class="field"><label for="{{ form.sla_normal.id_for_label }}">Normal (hrs)</label>{{ form.sla_normal }}</div>
         <div class="field"><label for="{{ form.sla_low.id_for_label }}">Low (hrs)</label>{{ form.sla_low }}</div>
       </div>
+
+      <div style="margin:22px 0 16px; padding-top:18px; border-top:1px solid var(--line);">
+        <strong>Business hours</strong>
+        <p class="hint" style="margin:4px 0 0;">When enabled, the SLA clock only ticks during work hours — a ticket opened Friday evening won't breach over the weekend.</p>
+      </div>
+      <label style="display:flex; gap:8px; align-items:center; margin-bottom:14px; font-weight:500;">
+        {{ form.business_hours_enabled }} Count SLA during business hours only
+      </label>
+      <div class="row">
+        <div class="field"><label for="{{ form.business_start.id_for_label }}">Start hour (0–23)</label>{{ form.business_start }}</div>
+        <div class="field"><label for="{{ form.business_end.id_for_label }}">End hour (0–23)</label>{{ form.business_end }}</div>
+        <div class="field"><label for="{{ form.business_days.id_for_label }}">Work days</label>{{ form.business_days }}</div>
+      </div>
+      <p class="hint" style="margin:-4px 0 0;">Work days: comma-separated, Mon=0 … Sun=6 (e.g. <code>0,1,2,3,4</code>).</p>
+
       {{ form.errors }}
-      <button class="btn" type="submit">Save settings</button>
+      <button class="btn" type="submit" style="margin-top:16px;">Save settings</button>
     </form>
   </div></div>
   <p class="hint" style="margin-top:12px;">Changes apply across the whole workspace immediately.</p>

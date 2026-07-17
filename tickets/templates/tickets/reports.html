@@ -8,6 +8,10 @@
     <div class="tile"><div class="n">{{ total }}</div><div class="k">Total tickets</div></div>
     <div class="tile"><div class="n">{{ open_count }}</div><div class="k">Open &amp; pending</div></div>
     <div class="tile"><div class="n">{{ avg_resolution|default:"—" }}</div><div class="k">Avg. time to resolve</div></div>
+    <div class="tile">
+      <div class="n">{% if csat_avg %}{{ csat_avg }}<span style="font-size:16px; color:var(--faint);">/5</span>{% else %}—{% endif %}</div>
+      <div class="k">CSAT{% if csat_n %} · {{ csat_n }} rating{{ csat_n|pluralize }}{% endif %}</div>
+    </div>
   </div>
 
   <div class="row" style="align-items:start;">

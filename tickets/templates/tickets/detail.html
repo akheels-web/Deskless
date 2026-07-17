@@ -177,6 +177,35 @@
         </div>
       </aside>
       {% endif %}
+
+      {% if ticket.csat_rating %}
+      <aside class="card">
+        <div class="hd">Satisfaction</div>
+        <div class="bd" style="text-align:center;">
+          <div class="rate-row" style="pointer-events:none;">
+            {% for n in "12345" %}<span class="rate-star {% if forloop.counter <= ticket.csat_rating %}on{% endif %}" style="font-size:22px;">★</span>{% endfor %}
+          </div>
+          <p class="hint" style="margin:6px 0 0;">Requester rated {{ ticket.csat_rating }}/5</p>
+        </div>
+      </aside>
+      {% endif %}
+
+      <!-- H2: audit history -->
+      <aside class="card">
+        <div class="hd">History</div>
+        <div class="bd">
+          <ul class="timeline">
+            {% for e in events %}
+            <li>
+              {{ e.description }}
+              <div class="when">{{ e.actor.username|default:"system" }} · {{ e.created_at|date:"M j, H:i" }}</div>
+            </li>
+            {% empty %}
+            <li style="border-left-color:transparent;"><span class="hint">No changes yet.</span></li>
+            {% endfor %}
+          </ul>
+        </div>
+      </aside>
     </div>
   </div>
 </main>
