@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block nav_home %}active{% endblock %}
+{% block content %}
+<div class="topbar">
+  <h1>Good to see you, {{ user.first_name|default:user.username }}</h1>
+  <div class="grow"></div>
+  <a class="btn" href="{% url 'ticket_new' %}">New ticket</a>
+</div>
+<main>
+  <!-- widget row: the numbers an agent wants the second they log in -->
+  <div class="tiles">
+    <a class="tile stat" href="{% url 'ticket_list' %}">
+      <div class="n">{{ open_count }}</div><div class="k">Open tickets</div>
+    </a>
+    <a class="tile stat" href="{% url 'ticket_list' %}?status=escalated">
+      <div class="n" style="color:var(--red);">{{ escalated_count }}</div><div class="k">Escalated</div>
+    </a>
+    <a class="tile stat" href="{% url 'ticket_list' %}?mine=1">
+      <div class="n">{{ mine_count }}</div><div class="k">Assigned to me</div>
+    </a>
+    <div class="tile">
+      <div class="n">{{ unassigned_count }}</div><div class="k">Unassigned</div>
+    </div>
+    <div class="tile">
+      <div class="n" style="color:var(--green);">{{ closed_count }}</div><div class="k">Closed all-time</div>
+    </div>
+  </div>
+
+  <div class="row" style="align-items:start;">
+    <div class="card">
+      <div class="hd">My open tickets</div>
+      <div class="bd" style="padding:0;">
+        {% for t in mine %}
+        <a href="{% url 'ticket_detail' t.pk %}" class="dash-row pr-{{ t.priority }}">
+          <span class="ref">DSK-{{ t.pk|stringformat:"04d" }}</span>
+          <span class="subj">{{ t.subject }}</span>
+          <span class="badge s-{{ t.status }}">{{ t.get_status_display }}</span>
+        </a>
+        {% empty %}
+        <div class="empty" style="padding:32px;">Nothing assigned to you. Enjoy the calm.</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="hd">Latest activity</div>
+      <div class="bd" style="padding:0;">
+        {% for t in recent %}
+        <a href="{% url 'ticket_detail' t.pk %}" class="dash-row pr-{{ t.priority }}">
+          <span class="ref">DSK-{{ t.pk|stringformat:"04d" }}</span>
+          <span class="subj">{{ t.subject }}</span>
+          <span class="meta">{{ t.updated_at|date:"M j" }}</span>
+        </a>
+        {% empty %}
+        <div class="empty" style="padding:32px;">No tickets yet.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</main>
+{% endblock %}

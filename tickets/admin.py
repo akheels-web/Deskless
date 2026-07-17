@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Comment, Ticket
+from .models import Comment, OrgSettings, Ticket, Webhook
 
 
 class CommentInline(admin.TabularInline):
@@ -14,7 +14,19 @@ class TicketAdmin(admin.ModelAdmin):
     list_filter = ("status", "priority", "assignee")
     search_fields = ("subject", "body")
     list_editable = ("status", "priority", "assignee")
+    filter_horizontal = ("related",)
     inlines = [CommentInline]
+
+
+@admin.register(OrgSettings)
+class OrgSettingsAdmin(admin.ModelAdmin):
+    list_display = ("name", "color", "accent")
+
+
+@admin.register(Webhook)
+class WebhookAdmin(admin.ModelAdmin):
+    list_display = ("event", "url", "active")
+    list_filter = ("event", "active")
 
 
 @admin.register(Comment)

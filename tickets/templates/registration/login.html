@@ -4,14 +4,18 @@
 <div class="public">
   <div class="public-card">
     <div class="public-brand">
-      <svg width="28" height="28" viewBox="0 0 32 32" fill="none" aria-hidden="true">
-        <path d="M6 5h20a3 3 0 0 1 3 3v13a3 3 0 0 1-3 3H13l-7 5v-5a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3Z" stroke="{{ brand_color }}" stroke-width="2.2" stroke-linejoin="round"/>
-        <path d="M11 14.5l3.5 3.5L22 10.5" stroke="{{ brand_accent }}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-      <strong>{{ brand_name }}</strong>
+      {% if brand_logo %}
+        <img src="{{ brand_logo }}" alt="{{ brand_name }}" style="max-height:40px; max-width:220px; object-fit:contain;">
+      {% else %}
+        <svg width="28" height="28" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+          <path d="M6 5h20a3 3 0 0 1 3 3v13a3 3 0 0 1-3 3H13l-7 5v-5a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3Z" stroke="{{ brand_color }}" stroke-width="2.2" stroke-linejoin="round"/>
+          <path d="M11 14.5l3.5 3.5L22 10.5" stroke="{{ brand_accent }}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <strong>{{ brand_name }}</strong>
+      {% endif %}
     </div>
     <div class="card"><div class="bd">
-      <h1>Sign in</h1>
+      <h1>Sign in to {{ brand_name }}</h1>
       <p class="lede">Agent access to the ticket queue.</p>
       {% if form.errors %}<ul class="errorlist"><li>That username and password didn't match. Try again.</li></ul>{% endif %}
       <form method="post" style="margin-top:16px;">
@@ -26,6 +30,14 @@
         </div>
         <button class="btn" type="submit" style="width:100%; justify-content:center;">Sign in</button>
       </form>
+      {% if sso_providers %}
+      <div class="sso-divider"><span>or continue with</span></div>
+      <div class="sso-buttons">
+        {% for p in sso_providers %}
+        <a class="btn ghost sso-btn" href="{{ p.login_url }}">{{ p.name }}</a>
+        {% endfor %}
+      </div>
+      {% endif %}
     </div></div>
   </div>
 </div>

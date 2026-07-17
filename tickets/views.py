@@ -1,42 +1,75 @@
 from django.contrib.auth import get_user_model
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.mail import send_mail
 from django.core.paginator import Paginator
 from django.db.models import Avg, Count, F, Q
 from django.shortcuts import get_object_or_404, redirect, render
 
-from .forms import AgentTicketForm, CommentForm, PublicTicketForm, TicketUpdateForm
-from .models import Ticket
+from .forms import (AgentTicketForm, CloseTicketForm, CommentForm, LinkTicketForm,
+                    NewUserForm, OrgSettingsForm, PublicTicketForm, TicketUpdateForm)
+from .models import OrgSettings, Ticket
+from .signals import fire_webhooks
 
 User = get_user_model()
+admin_only = user_passes_test(lambda u: u.is_superuser)
+
+
+# ---- F5: landing dashboard ----
+
+@login_required
+def dashboard(request):
+    qs = Ticket.objects.all()
+    by_status = dict(qs.values_list("status").annotate(n=Count("id")))
+    mine = qs.filter(assignee=request.user).exclude(status="closed")
+    return render(request, "tickets/dashboard.html", {
+        "open_count": sum(by_status.get(s, 0) for s in Ticket.OPEN_STATES),
+        "escalated_count": by_status.get("escalated", 0),
+        "closed_count": by_status.get("closed", 0),
+        "unassigned_count": qs.filter(assignee__isnull=True).exclude(status="closed").count(),
+        "mine": mine[:8],
+        "mine_count": mine.count(),
+        "recent": qs.select_related("reporter")[:6],
+    })
 
 
 # ---- Phase 2: agent UI (staff only) ----
 
+def _view_filter(qs, view, user):
+    """Map a left-panel view name to a queryset filter."""
+    if view == "mine":
+        return qs.filter(assignee=user).exclude(status="closed")
+    if view == "unassigned":
+        return qs.filter(assignee__isnull=True).exclude(status="closed")
+    if view == "closed":
+        return qs.filter(status="closed")
+    if view == "all":
+        return qs
+    return qs.exclude(status="closed")  # "open" (default): everything not closed
+
+
 @login_required
 def ticket_list(request):
-    tickets = Ticket.objects.select_related("reporter", "assignee")
-    status = request.GET.get("status")
-    mine = request.GET.get("mine")
+    base = Ticket.objects.select_related("reporter", "assignee")
+    view = request.GET.get("view", "open")
     query = request.GET.get("q", "")
-    if status:
-        tickets = tickets.filter(status=status)
-    if mine:
-        tickets = tickets.filter(assignee=request.user)
+
+    tickets = _view_filter(base, view, request.user)
     if query:
         tickets = tickets.filter(Q(subject__icontains=query) | Q(body__icontains=query))
 
+    # counts for the left panel badges
+    counts = {v: _view_filter(base, v, request.user).count()
+              for v in ("open", "mine", "unassigned", "closed", "all")}
+
     page_obj = Paginator(tickets, 25).get_page(request.GET.get("page"))
-    # querystring (minus page) so pager links keep the active filters
     params = request.GET.copy()
     params.pop("page", None)
     qs = params.urlencode()
     return render(request, "tickets/list.html", {
         "tickets": page_obj,
         "page_obj": page_obj,
-        "status_choices": Ticket.STATUS,
-        "current_status": status,
-        "mine": mine,
+        "view": view,
+        "counts": counts,
         "query": query,
         "qs": qs + "&" if qs else "",
     })
@@ -74,19 +107,40 @@ def ticket_detail(request, pk):
                 c.author = request.user
                 c.save()
                 notify_reporter(ticket, c)
-                return redirect("ticket_detail", pk=pk)
-            uform = TicketUpdateForm(instance=ticket)
-        else:
+            return redirect("ticket_detail", pk=pk)
+        elif "link" in request.POST:  # F2: link another ticket
+            lform = LinkTicketForm(request.POST)
+            if lform.is_valid():
+                other = Ticket.objects.filter(pk=lform.cleaned_data["ticket_id"]).first()
+                if other and other.pk != ticket.pk:
+                    ticket.related.add(other)
+            return redirect("ticket_detail", pk=pk)
+        elif "unlink" in request.POST:
+            ticket.related.remove(request.POST["unlink"])
+            return redirect("ticket_detail", pk=pk)
+        elif "close" in request.POST:  # F2: close with resolution + cascade
+            close_form = CloseTicketForm(request.POST)
+            if close_form.is_valid():
+                ticket.close_with_resolution(
+                    close_form.cleaned_data["resolution"],
+                    cascade=close_form.cleaned_data["cascade"],
+                )
+                fire_webhooks("ticket.closed", ticket)
+            return redirect("ticket_detail", pk=pk)
+        else:  # properties update
+            prev_assignee = ticket.assignee_id
             uform = TicketUpdateForm(request.POST, instance=ticket)
             if uform.is_valid():
-                uform.save()
-                return redirect("ticket_detail", pk=pk)
-            cform = CommentForm()
-    else:
-        cform = CommentForm()
-        uform = TicketUpdateForm(instance=ticket)
+                ticket = uform.save()
+                if ticket.assignee_id and ticket.assignee_id != prev_assignee:
+                    from .notifications import notify_assignment
+                    notify_assignment(ticket)  # R3: email newly-assigned agent
+            return redirect("ticket_detail", pk=pk)
     return render(request, "tickets/detail.html", {
-        "ticket": ticket, "comments": comments, "cform": cform, "uform": uform,
+        "ticket": ticket, "comments": comments,
+        "cform": CommentForm(), "uform": TicketUpdateForm(instance=ticket),
+        "close_form": CloseTicketForm(), "link_form": LinkTicketForm(),
+        "related": ticket.related.all(),
     })
 
 
@@ -95,9 +149,8 @@ def reports(request):
     qs = Ticket.objects.all()
     by_status = dict(qs.values_list("status").annotate(n=Count("id")))
     by_priority = dict(qs.values_list("priority").annotate(n=Count("id")))
-    # avg resolution time for tickets that reached resolved/closed
-    resolved = qs.filter(status__in=["resolved", "closed"])
-    avg_delta = resolved.aggregate(
+    # avg resolution time for closed tickets
+    avg_delta = qs.filter(status="closed").aggregate(
         avg=Avg(F("updated_at") - F("created_at")))["avg"]
     by_agent = list(qs.filter(assignee__isnull=False)
                     .values("assignee__username")
@@ -109,7 +162,7 @@ def reports(request):
         "total": qs.count(),
         "by_status": status_rows,
         "by_priority": priority_rows,
-        "open_count": by_status.get("open", 0) + by_status.get("pending", 0),
+        "open_count": sum(by_status.get(s, 0) for s in Ticket.OPEN_STATES),
         "avg_resolution": _fmt_duration(avg_delta),
         "by_agent": by_agent,
         "status_max": max([n for _, n in status_rows] + [1]),
@@ -163,3 +216,35 @@ def notify_reporter(ticket, comment):
         recipient_list=[ticket.reporter.email],
         fail_silently=True,  # ponytail: don't 500 the agent if SMTP is down
     )
+
+
+# ---- F4: team / role management (admins only) ----
+
+@admin_only
+def team(request):
+    if request.method == "POST":
+        form = NewUserForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect("team")
+    else:
+        form = NewUserForm()
+    return render(request, "tickets/team.html", {
+        "form": form,
+        "users": User.objects.order_by("-is_superuser", "-is_staff", "username"),
+    })
+
+
+# ---- F3: org settings + logo (admins only) ----
+
+@admin_only
+def org_settings(request):
+    org = OrgSettings.load()
+    if request.method == "POST":
+        form = OrgSettingsForm(request.POST, request.FILES, instance=org)
+        if form.is_valid():
+            form.save()
+            return redirect("org_settings")
+    else:
+        form = OrgSettingsForm(instance=org)
+    return render(request, "tickets/settings.html", {"form": form, "org": org})

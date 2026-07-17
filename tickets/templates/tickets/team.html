@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Team{% endblock %}
+{% block nav_team %}active{% endblock %}
+{% block content %}
+<div class="topbar"><h1>Team</h1></div>
+<main>
+  <div class="row" style="align-items:start;">
+    <div class="card" style="flex:2;">
+      <div class="hd">Members</div>
+      <table class="queue" style="border:0; border-radius:0;">
+        <thead><tr><th>User</th><th>Email</th><th>Role</th></tr></thead>
+        <tbody>
+          {% for u in users %}
+          <tr>
+            <td class="subj">{{ u.username }}</td>
+            <td class="meta">{{ u.email|default:"—" }}</td>
+            <td>
+              {% if u.is_superuser %}<span class="badge s-escalated">Admin</span>
+              {% elif u.is_staff %}<span class="badge s-open">Agent</span>
+              {% else %}<span class="badge s-closed">Customer</span>{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card" style="flex:1;">
+      <div class="hd">Add a member</div>
+      <div class="bd">
+        <form method="post">
+          {% csrf_token %}
+          <div class="field"><label for="{{ form.username.id_for_label }}">Username</label>{{ form.username }}</div>
+          <div class="field"><label for="{{ form.email.id_for_label }}">Email</label>{{ form.email }}</div>
+          <div class="field"><label for="{{ form.password.id_for_label }}">Password</label>{{ form.password }}</div>
+          <label style="display:flex; gap:8px; align-items:center; margin-bottom:8px; font-weight:500;">
+            {{ form.is_staff }} Agent — can work the queue
+          </label>
+          <label style="display:flex; gap:8px; align-items:center; margin-bottom:16px; font-weight:500;">
+            {{ form.is_superuser }} Admin — can manage team &amp; settings
+          </label>
+          {{ form.errors }}
+          <button class="btn" type="submit">Add member</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</main>
+{% endblock %}

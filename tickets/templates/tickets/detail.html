@@ -15,6 +15,15 @@
         on {{ ticket.created_at|date:"M j, Y · H:i" }}
       </p>
 
+      {% if ticket.status == "closed" and ticket.resolution %}
+      <div class="card" style="border-color:var(--green); background:var(--green-bg); margin-bottom:16px;">
+        <div class="bd">
+          <div class="note-tag" style="color:var(--green);">Resolution</div>
+          <div class="text" style="margin-top:4px;">{{ ticket.resolution }}</div>
+        </div>
+      </div>
+      {% endif %}
+
       <div class="card"><div class="bd">
         <div class="thread">
           <div class="msg">
@@ -39,6 +48,7 @@
         </div>
       </div></div>
 
+      {% if ticket.is_open %}
       <div class="card"><div class="bd">
         <form method="post">
           {% csrf_token %}
@@ -54,27 +64,84 @@
           </div>
         </form>
       </div></div>
+      {% endif %}
     </div>
 
-    <!-- right: properties -->
-    <aside class="card">
-      <div class="hd">Properties</div>
-      <div class="bd">
-        <form method="post">
-          {% csrf_token %}
-          <div class="field"><label>Status</label>{{ uform.status }}</div>
-          <div class="field"><label>Priority</label>{{ uform.priority }}</div>
-          <div class="field"><label>Assignee</label>{{ uform.assignee }}</div>
-          <button class="btn ghost" name="update" value="1" style="width:100%; justify-content:center;">Save changes</button>
-        </form>
-        <div style="margin-top:18px; padding-top:16px; border-top:1px solid var(--line);">
-          <p class="hint" style="margin:0 0 4px;">Requester</p>
-          <p style="margin:0 0 12px;">{{ ticket.reporter.email|default:ticket.reporter.username }}</p>
-          <p class="hint" style="margin:0 0 4px;">Last activity</p>
-          <p style="margin:0;">{{ ticket.updated_at|date:"M j, Y · H:i" }}</p>
+    <!-- right: properties + links + close -->
+    <div>
+      <aside class="card">
+        <div class="hd">Properties</div>
+        <div class="bd">
+          <form method="post">
+            {% csrf_token %}
+            <div class="field"><label>Status</label>{{ uform.status }}</div>
+            <div class="field"><label>Priority</label>{{ uform.priority }}</div>
+            <div class="field"><label>Assignee</label>{{ uform.assignee }}</div>
+            <button class="btn ghost" name="update" value="1" style="width:100%; justify-content:center;">Save changes</button>
+          </form>
+          <div style="margin-top:18px; padding-top:16px; border-top:1px solid var(--line);">
+            <p class="hint" style="margin:0 0 4px;">Requester</p>
+            <p style="margin:0 0 12px;">{{ ticket.reporter.email|default:ticket.reporter.username }}</p>
+            <p class="hint" style="margin:0 0 4px;">Last activity</p>
+            <p style="margin:0 0 12px;">{{ ticket.updated_at|date:"M j, Y · H:i" }}</p>
+            {% if ticket.due_at %}
+            <p class="hint" style="margin:0 0 4px;">SLA due</p>
+            <p style="margin:0; {% if ticket.is_overdue %}color:var(--red); font-weight:600;{% endif %}">
+              {{ ticket.due_at|date:"M j, Y · H:i" }}{% if ticket.is_overdue %} · overdue{% endif %}
+            </p>
+            {% endif %}
+          </div>
         </div>
-      </div>
-    </aside>
+      </aside>
+
+      <!-- F2: linked tickets -->
+      <aside class="card">
+        <div class="hd">Linked tickets</div>
+        <div class="bd">
+          {% for r in related %}
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+            <a href="{% url 'ticket_detail' r.pk %}" class="ref">DSK-{{ r.pk|stringformat:"04d" }}</a>
+            <span class="badge s-{{ r.status }}" style="font-size:11px;">{{ r.get_status_display }}</span>
+            <form method="post" style="margin-left:auto;">{% csrf_token %}
+              <button name="unlink" value="{{ r.pk }}" title="Unlink"
+                style="background:none;border:0;color:var(--faint);cursor:pointer;font-size:16px;line-height:1;">×</button>
+            </form>
+          </div>
+          {% empty %}
+          <p class="hint" style="margin:0 0 12px;">No linked tickets. Link related issues so they resolve together.</p>
+          {% endfor %}
+          <form method="post" style="display:flex; gap:6px; margin-top:6px;">
+            {% csrf_token %}
+            {{ link_form.ticket_id }}
+            <button class="btn ghost" name="link" value="1">Link</button>
+          </form>
+        </div>
+      </aside>
+
+      <!-- F2: close with resolution -->
+      {% if ticket.is_open %}
+      <aside class="card" style="border-color:var(--line-strong);">
+        <div class="hd">Close ticket</div>
+        <div class="bd">
+          <form method="post">
+            {% csrf_token %}
+            <div class="field">
+              <label for="id_resolution">Resolution</label>
+              {{ close_form.resolution }}
+            </div>
+            {% if related %}
+            <label style="display:flex; gap:7px; align-items:center; margin-bottom:12px; font-weight:500; color:var(--muted);">
+              {{ close_form.cascade }} Also close {{ related|length }} linked ticket{{ related|length|pluralize }}
+            </label>
+            {% endif %}
+            <button class="btn" name="close" value="1" style="width:100%; justify-content:center; background:var(--green); border-color:var(--green);">
+              Resolve &amp; close
+            </button>
+          </form>
+        </div>
+      </aside>
+      {% endif %}
+    </div>
   </div>
 </main>
 {% endblock %}

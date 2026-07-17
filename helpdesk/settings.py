@@ -51,8 +51,23 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework.authtoken',
+    'django.contrib.sites',
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',
+    'allauth.socialaccount.providers.microsoft',
+    'allauth.socialaccount.providers.zoho',
     'tickets',
 ]
+
+SITE_ID = 1
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+    'allauth.account.auth_backends.AuthenticationBackend',
+]
+# ponytail: SSO users are agents by default via a signal (see tickets/signals.py).
+SOCIALACCOUNT_LOGIN_ON_GET = True  # skip allauth's confirm page → straight to provider
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
@@ -71,6 +86,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'allauth.account.middleware.AccountMiddleware',
 ]
 
 ROOT_URLCONF = 'helpdesk.urls'
@@ -86,6 +102,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'tickets.context_processors.branding',
+                'tickets.context_processors.sso',
             ],
         },
     },
@@ -149,6 +166,10 @@ STORAGES = {
     'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
 }
 
+# Uploaded files (org logo). Served by Django in dev; by the proxy in prod.
+MEDIA_URL = 'media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
 # Branding — override per client via env.
 BRAND_NAME = os.environ.get('BRAND_NAME', 'Deskless')
 BRAND_COLOR = os.environ.get('BRAND_COLOR', '#1f2937')   # header background
@@ -156,7 +177,7 @@ BRAND_ACCENT = os.environ.get('BRAND_ACCENT', '#2563eb')  # buttons / links
 
 # Auth
 LOGIN_URL = 'login'
-LOGIN_REDIRECT_URL = 'ticket_list'
+LOGIN_REDIRECT_URL = 'dashboard'
 LOGOUT_REDIRECT_URL = 'login'
 
 # Email — SMTP when EMAIL_HOST is set, else console (dev prints to terminal).
