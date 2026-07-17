@@ -20,8 +20,8 @@ services:
       DATABASE_URL: postgres://helpdesk:${DB_PASSWORD:-helpdesk}@db:5432/helpdesk
     volumes:
       - media:/app/media   # uploaded logos & attachments survive rebuilds
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"             # Coolify/Traefik routes to this internally — no host port bind
     depends_on:
       db:
         condition: service_healthy
