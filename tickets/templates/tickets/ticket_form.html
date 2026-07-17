@@ -10,7 +10,7 @@
   <h1 style="font-size:20px; font-weight:660; letter-spacing:-0.3px; margin:0 0 4px;">Log a ticket</h1>
   <p class="hint" style="margin:0 0 22px;">For requests that come in by phone or in person.</p>
   <div class="card"><div class="bd">
-    <form method="post">
+    <form method="post" enctype="multipart/form-data">
       {% csrf_token %}
       <div class="field">
         <label for="{{ form.email.id_for_label }}">Requester email</label>
@@ -20,13 +20,23 @@
         <label for="{{ form.subject.id_for_label }}">Subject</label>
         {{ form.subject }}{{ form.subject.errors }}
       </div>
-      <div class="field">
-        <label for="{{ form.priority.id_for_label }}">Priority</label>
-        {{ form.priority }}{{ form.priority.errors }}
+      <div class="row">
+        <div class="field">
+          <label for="{{ form.priority.id_for_label }}">Priority</label>
+          {{ form.priority }}{{ form.priority.errors }}
+        </div>
+        <div class="field">
+          <label for="{{ form.category.id_for_label }}">Category</label>
+          {{ form.category }}{{ form.category.errors }}
+        </div>
       </div>
       <div class="field">
         <label for="{{ form.body.id_for_label }}">Details</label>
         {{ form.body }}{{ form.body.errors }}
+      </div>
+      <div class="field">
+        <label for="id_files">Attach files</label>
+        <input type="file" name="files" id="id_files" multiple>
       </div>
       <button class="btn" type="submit">Create ticket</button>
     </form>

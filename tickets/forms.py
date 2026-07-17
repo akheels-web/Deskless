@@ -7,18 +7,21 @@ User = get_user_model()
 
 
 class TicketUpdateForm(forms.ModelForm):
-    """Agent-side: change status/priority/assignee."""
+    """Agent-side: change status/priority/assignee/category/tags."""
 
     class Meta:
         model = Ticket
-        fields = ["status", "priority", "assignee"]
+        fields = ["status", "priority", "assignee", "category", "tags"]
+        widgets = {"tags": forms.CheckboxSelectMultiple}
 
 
 class CommentForm(forms.ModelForm):
+    # body optional so an attachment-only reply is allowed (view enforces "body or file")
+    body = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 4}))
+
     class Meta:
         model = Comment
         fields = ["body", "internal"]
-        widgets = {"body": forms.Textarea(attrs={"rows": 4})}
 
 
 class PublicTicketForm(forms.ModelForm):
@@ -40,7 +43,7 @@ class AgentTicketForm(forms.ModelForm):
 
     class Meta:
         model = Ticket
-        fields = ["subject", "body", "priority"]
+        fields = ["subject", "body", "priority", "category"]
         widgets = {"body": forms.Textarea(attrs={"rows": 6})}
 
 

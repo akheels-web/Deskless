@@ -13,7 +13,7 @@
     <div class="card"><div class="bd">
       <h1>How can we help?</h1>
       <p class="lede">Tell us what's going on and we'll get back to you by email.</p>
-      <form method="post">
+      <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
         <div class="row">
           <div class="field">
@@ -32,6 +32,10 @@
         <div class="field">
           <label for="{{ form.body.id_for_label }}">Describe your issue</label>
           {{ form.body }}{{ form.body.errors }}
+        </div>
+        <div class="field">
+          <label for="id_files">Attach files (optional)</label>
+          <input type="file" name="files" id="id_files" multiple>
         </div>
         <button class="btn" type="submit" style="width:100%; justify-content:center;">Submit request</button>
       </form>

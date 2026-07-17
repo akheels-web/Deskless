@@ -19,5 +19,6 @@ class TicketSerializer(serializers.ModelSerializer):
     class Meta:
         model = Ticket
         fields = ["id", "subject", "body", "status", "priority", "resolution",
-                  "reporter", "assignee", "related", "created_at", "updated_at", "comments"]
+                  "reporter", "assignee", "category", "tags", "related",
+                  "created_at", "updated_at", "comments"]
         read_only_fields = ["reporter", "created_at", "updated_at"]

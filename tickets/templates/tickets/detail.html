@@ -48,13 +48,39 @@
         </div>
       </div></div>
 
+      {% if attachments %}
+      <div class="card"><div class="bd">
+        <div class="note-tag" style="color:var(--muted);">Attachments</div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">
+          {% for a in attachments %}
+          <a class="attach" href="{{ a.file.url }}" target="_blank" rel="noopener">
+            📎 {{ a.filename }}
+          </a>
+          {% endfor %}
+        </div>
+      </div></div>
+      {% endif %}
+
       {% if ticket.is_open %}
       <div class="card"><div class="bd">
-        <form method="post">
+        <form method="post" enctype="multipart/form-data">
           {% csrf_token %}
+          {% if canned %}
+          <div class="field">
+            <label for="canned-select">Canned reply</label>
+            <select id="canned-select" onchange="insertCanned(this)">
+              <option value="">— insert a saved reply —</option>
+              {% for cr in canned %}<option value="{{ cr.body|escape }}">{{ cr.title }}</option>{% endfor %}
+            </select>
+          </div>
+          {% endif %}
           <div class="field">
             <label for="id_body">Reply</label>
             {{ cform.body }}
+          </div>
+          <div class="field">
+            <label for="id_files">Attach files</label>
+            <input type="file" name="files" id="id_files" multiple>
           </div>
           <div style="display:flex; align-items:center; gap:14px;">
             <button class="btn" name="add_comment" value="1">Send reply</button>
@@ -64,6 +90,14 @@
           </div>
         </form>
       </div></div>
+      <script>
+        function insertCanned(sel) {
+          if (!sel.value) return;
+          var ta = document.getElementById('id_body');
+          ta.value = ta.value ? ta.value + '\n\n' + sel.value : sel.value;
+          sel.value = ''; ta.focus();
+        }
+      </script>
       {% endif %}
     </div>
 
@@ -77,6 +111,8 @@
             <div class="field"><label>Status</label>{{ uform.status }}</div>
             <div class="field"><label>Priority</label>{{ uform.priority }}</div>
             <div class="field"><label>Assignee</label>{{ uform.assignee }}</div>
+            <div class="field"><label>Category</label>{{ uform.category }}</div>
+            <div class="field"><label>Tags</label>{{ uform.tags }}</div>
             <button class="btn ghost" name="update" value="1" style="width:100%; justify-content:center;">Save changes</button>
           </form>
           <div style="margin-top:18px; padding-top:16px; border-top:1px solid var(--line);">

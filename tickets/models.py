@@ -2,6 +2,31 @@ from django.conf import settings
 from django.db import models
 
 
+class Category(models.Model):
+    """A bucket/department a ticket belongs to (Billing, IT, Sales…)."""
+
+    name = models.CharField(max_length=80, unique=True)
+
+    class Meta:
+        verbose_name_plural = "categories"
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
+class Tag(models.Model):
+    """Freeform label for cross-cutting themes (vip, bug, refund…)."""
+
+    name = models.CharField(max_length=40, unique=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
 class Ticket(models.Model):
     # ponytail: agent = User.is_staff, customer = regular user. No role field needed.
     STATUS = [
@@ -40,6 +65,11 @@ class Ticket(models.Model):
     )
     # F2: link similar tickets. symmetrical = link is mutual (A linked to B ⇒ B linked to A).
     related = models.ManyToManyField("self", blank=True)
+
+    # G1: routing & labels
+    category = models.ForeignKey(
+        Category, on_delete=models.SET_NULL, null=True, blank=True, related_name="tickets")
+    tags = models.ManyToManyField(Tag, blank=True, related_name="tickets")
 
     # R3: SLA — resolution deadline computed from priority at creation.
     due_at = models.DateTimeField(null=True, blank=True)
@@ -89,6 +119,38 @@ class Comment(models.Model):
 
     def __str__(self):
         return f"Comment on #{self.ticket_id} by {self.author}"
+
+
+class Attachment(models.Model):
+    """G2: a file on a ticket (screenshot, log, doc)."""
+
+    ticket = models.ForeignKey(Ticket, on_delete=models.CASCADE, related_name="attachments")
+    file = models.FileField(upload_to="attachments/%Y/%m/")
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    @property
+    def filename(self):
+        import os
+        return os.path.basename(self.file.name)
+
+    def __str__(self):
+        return self.filename
+
+
+class CannedReply(models.Model):
+    """G3: a saved answer agents can drop into a reply."""
+
+    title = models.CharField(max_length=100)
+    body = models.TextField()
+
+    class Meta:
+        ordering = ["title"]
+        verbose_name_plural = "canned replies"
+
+    def __str__(self):
+        return self.title
 
 
 class OrgSettings(models.Model):

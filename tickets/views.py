@@ -7,8 +7,14 @@ from django.shortcuts import get_object_or_404, redirect, render
 
 from .forms import (AgentTicketForm, CloseTicketForm, CommentForm, LinkTicketForm,
                     NewUserForm, OrgSettingsForm, PublicTicketForm, TicketUpdateForm)
-from .models import OrgSettings, Ticket
+from .models import Attachment, CannedReply, Category, OrgSettings, Ticket
 from .signals import fire_webhooks
+
+
+def _save_attachments(ticket, files, user):
+    """G2: persist uploaded files against a ticket."""
+    for f in files:
+        Attachment.objects.create(ticket=ticket, file=f, uploaded_by=user)
 
 User = get_user_model()
 admin_only = user_passes_test(lambda u: u.is_superuser)
@@ -49,13 +55,16 @@ def _view_filter(qs, view, user):
 
 @login_required
 def ticket_list(request):
-    base = Ticket.objects.select_related("reporter", "assignee")
+    base = Ticket.objects.select_related("reporter", "assignee", "category")
     view = request.GET.get("view", "open")
     query = request.GET.get("q", "")
+    cat = request.GET.get("category", "")
 
     tickets = _view_filter(base, view, request.user)
     if query:
         tickets = tickets.filter(Q(subject__icontains=query) | Q(body__icontains=query))
+    if cat:
+        tickets = tickets.filter(category_id=cat)
 
     # counts for the left panel badges
     counts = {v: _view_filter(base, v, request.user).count()
@@ -71,6 +80,8 @@ def ticket_list(request):
         "view": view,
         "counts": counts,
         "query": query,
+        "categories": Category.objects.all(),
+        "current_category": cat,
         "qs": qs + "&" if qs else "",
     })
 
@@ -88,6 +99,7 @@ def ticket_new(request):
             ticket = form.save(commit=False)
             ticket.reporter = reporter
             ticket.save()
+            _save_attachments(ticket, request.FILES.getlist("files"), request.user)
             return redirect("ticket_detail", pk=ticket.pk)
     else:
         form = AgentTicketForm()
@@ -101,11 +113,13 @@ def ticket_detail(request, pk):
     if request.method == "POST":
         if "add_comment" in request.POST:
             cform = CommentForm(request.POST)
-            if cform.is_valid():
+            files = request.FILES.getlist("files")
+            if cform.is_valid() and (cform.cleaned_data["body"] or files):
                 c = cform.save(commit=False)
                 c.ticket = ticket
                 c.author = request.user
                 c.save()
+                _save_attachments(ticket, files, request.user)
                 notify_reporter(ticket, c)
             return redirect("ticket_detail", pk=pk)
         elif "link" in request.POST:  # F2: link another ticket
@@ -141,6 +155,8 @@ def ticket_detail(request, pk):
         "cform": CommentForm(), "uform": TicketUpdateForm(instance=ticket),
         "close_form": CloseTicketForm(), "link_form": LinkTicketForm(),
         "related": ticket.related.all(),
+        "attachments": ticket.attachments.all(),
+        "canned": CannedReply.objects.all(),
     })
 
 
@@ -197,6 +213,7 @@ def submit_ticket(request):
             ticket = form.save(commit=False)
             ticket.reporter = reporter
             ticket.save()
+            _save_attachments(ticket, request.FILES.getlist("files"), reporter)
             return render(request, "tickets/submitted.html", {"ticket": ticket})
     else:
         form = PublicTicketForm()

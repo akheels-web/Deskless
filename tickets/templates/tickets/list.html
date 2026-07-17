@@ -30,6 +30,15 @@
     <a href="?view=all" class="view-link {% if view == 'all' %}on{% endif %}">
       <span>All tickets</span><span class="count">{{ counts.all }}</span>
     </a>
+    {% if categories %}
+    <div class="views-heading">Categories</div>
+    <a href="?view={{ view }}" class="view-link {% if not current_category %}on{% endif %}"><span>Any</span></a>
+    {% for cat in categories %}
+    <a href="?view={{ view }}&category={{ cat.id }}" class="view-link {% if current_category == cat.id|stringformat:'s' %}on{% endif %}">
+      <span>{{ cat.name }}</span>
+    </a>
+    {% endfor %}
+    {% endif %}
   </nav>
 
   <div class="queue-main">
@@ -37,7 +46,7 @@
       <thead>
         <tr>
           <th></th><th>Ref</th><th>Subject</th><th>Status</th><th>Priority</th>
-          <th>Requester</th><th>Assignee</th><th>Updated</th>
+          <th>Category</th><th>Requester</th><th>Assignee</th><th>Updated</th>
         </tr>
       </thead>
       <tbody>
@@ -51,12 +60,13 @@
             {% if t.is_overdue %}<span class="badge overdue" title="Past SLA deadline">Overdue</span>{% endif %}
           </td>
           <td><span class="prio p-{{ t.priority }}">{{ t.get_priority_display }}</span></td>
+          <td class="meta">{% if t.category %}<span class="tag">{{ t.category.name }}</span>{% else %}—{% endif %}</td>
           <td class="meta">{{ t.reporter.get_full_name|default:t.reporter.username }}</td>
           <td class="meta">{{ t.assignee.username|default:"—" }}</td>
           <td class="meta">{{ t.updated_at|date:"M j, H:i" }}</td>
         </tr>
         {% empty %}
-        <tr><td colspan="8"><div class="empty">Nothing in this view. When a request comes in, it lands here.</div></td></tr>
+        <tr><td colspan="9"><div class="empty">Nothing in this view. When a request comes in, it lands here.</div></td></tr>
         {% endfor %}
       </tbody>
     </table>
