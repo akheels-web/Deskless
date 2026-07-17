@@ -1,12 +1,41 @@
 {% extends "base.html" %}
 {% block title %}Submit a request{% endblock %}
-{% block content %}
-<h1>Submit a request</h1>
-<div class="card">
-  <form method="post">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button>Submit</button>
-  </form>
+{% block body %}
+<div class="public">
+  <div class="public-card">
+    <div class="public-brand">
+      <svg width="28" height="28" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <path d="M6 5h20a3 3 0 0 1 3 3v13a3 3 0 0 1-3 3H13l-7 5v-5a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3Z" stroke="{{ brand_color }}" stroke-width="2.2" stroke-linejoin="round"/>
+        <path d="M11 14.5l3.5 3.5L22 10.5" stroke="{{ brand_accent }}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <strong>{{ brand_name }}</strong>
+    </div>
+    <div class="card"><div class="bd">
+      <h1>How can we help?</h1>
+      <p class="lede">Tell us what's going on and we'll get back to you by email.</p>
+      <form method="post">
+        {% csrf_token %}
+        <div class="row">
+          <div class="field">
+            <label for="{{ form.name.id_for_label }}">Your name</label>
+            {{ form.name }}{{ form.name.errors }}
+          </div>
+          <div class="field">
+            <label for="{{ form.email.id_for_label }}">Email</label>
+            {{ form.email }}{{ form.email.errors }}
+          </div>
+        </div>
+        <div class="field">
+          <label for="{{ form.subject.id_for_label }}">Subject</label>
+          {{ form.subject }}{{ form.subject.errors }}
+        </div>
+        <div class="field">
+          <label for="{{ form.body.id_for_label }}">Describe your issue</label>
+          {{ form.body }}{{ form.body.errors }}
+        </div>
+        <button class="btn" type="submit" style="width:100%; justify-content:center;">Submit request</button>
+      </form>
+    </div></div>
+  </div>
 </div>
 {% endblock %}

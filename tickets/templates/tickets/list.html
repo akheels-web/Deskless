@@ -1,32 +1,56 @@
 {% extends "base.html" %}
-{% block title %}Tickets{% endblock %}
+{% block title %}Queue{% endblock %}
+{% block nav_queue %}active{% endblock %}
 {% block content %}
-<h1>Tickets</h1>
-<form method="get" style="margin-bottom:12px">
-  <input type="search" name="q" placeholder="Search…" value="{{ request.GET.q }}">
-  <button>Search</button>
-</form>
-<nav class="filters">
-  <a href="?">All</a>
-  {% for value, label in status_choices %}
-    <a href="?status={{ value }}"{% if current_status == value %} style="font-weight:bold"{% endif %}>{{ label }}</a>
-  {% endfor %}
-  <a href="?mine=1">Assigned to me</a>
-</nav>
-<table>
-  <tr><th>#</th><th>Subject</th><th>Status</th><th>Priority</th><th>Reporter</th><th>Assignee</th><th>Updated</th></tr>
-  {% for t in tickets %}
-  <tr>
-    <td>{{ t.pk }}</td>
-    <td><a href="{% url 'ticket_detail' t.pk %}">{{ t.subject }}</a></td>
-    <td><span class="badge {{ t.status }}">{{ t.get_status_display }}</span></td>
-    <td class="{{ t.priority }}">{{ t.get_priority_display }}</td>
-    <td>{{ t.reporter.username }}</td>
-    <td>{{ t.assignee.username|default:"—" }}</td>
-    <td>{{ t.updated_at|date:"M d, H:i" }}</td>
-  </tr>
-  {% empty %}
-  <tr><td colspan="7">No tickets.</td></tr>
-  {% endfor %}
-</table>
+<div class="topbar">
+  <h1>Queue</h1>
+  <div class="grow"></div>
+  <a class="btn" href="{% url 'ticket_new' %}">New ticket</a>
+</div>
+<main>
+  <div class="filters">
+    <a class="chip {% if not current_status and not mine %}on{% endif %}" href="{% url 'ticket_list' %}">All</a>
+    {% for value, label in status_choices %}
+      <a class="chip {% if current_status == value %}on{% endif %}" href="?status={{ value }}">{{ label }}</a>
+    {% endfor %}
+    <a class="chip {% if mine %}on{% endif %}" href="?mine=1">Assigned to me</a>
+    <form method="get">
+      <input type="search" name="q" placeholder="Search subject or body…" value="{{ query }}" aria-label="Search tickets">
+      <button class="btn ghost" type="submit">Search</button>
+    </form>
+  </div>
+
+  <table class="queue">
+    <thead>
+      <tr>
+        <th></th><th>Ref</th><th>Subject</th><th>Status</th><th>Priority</th>
+        <th>Requester</th><th>Assignee</th><th>Updated</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in tickets %}
+      <tr class="pr-{{ t.priority }}">
+        <td class="spine"><span></span></td>
+        <td><span class="ref">DSK-{{ t.pk|stringformat:"04d" }}</span></td>
+        <td><a class="subj" href="{% url 'ticket_detail' t.pk %}">{{ t.subject }}</a></td>
+        <td><span class="badge s-{{ t.status }}">{{ t.get_status_display }}</span></td>
+        <td><span class="prio p-{{ t.priority }}">{{ t.get_priority_display }}</span></td>
+        <td class="meta">{{ t.reporter.get_full_name|default:t.reporter.username }}</td>
+        <td class="meta">{{ t.assignee.username|default:"—" }}</td>
+        <td class="meta">{{ t.updated_at|date:"M j, H:i" }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="8"><div class="empty">Nothing in this view. When a request comes in, it lands here.</div></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if page_obj.has_other_pages %}
+  <div class="pager">
+    {% if page_obj.has_previous %}<a class="chip" href="?{{ qs }}page={{ page_obj.previous_page_number }}">← Prev</a>{% endif %}
+    <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}<a class="chip" href="?{{ qs }}page={{ page_obj.next_page_number }}">Next →</a>{% endif %}
+  </div>
+  {% endif %}
+</main>
 {% endblock %}

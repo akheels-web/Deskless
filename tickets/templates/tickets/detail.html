@@ -1,40 +1,80 @@
 {% extends "base.html" %}
-{% block title %}#{{ ticket.pk }} {{ ticket.subject }}{% endblock %}
+{% block title %}DSK-{{ ticket.pk|stringformat:"04d" }}{% endblock %}
 {% block content %}
-<p><a href="{% url 'ticket_list' %}">← Back</a></p>
-<div class="card">
-  <h1>#{{ ticket.pk }} {{ ticket.subject }}</h1>
-  <p><span class="badge {{ ticket.status }}">{{ ticket.get_status_display }}</span>
-     · <span class="{{ ticket.priority }}">{{ ticket.get_priority_display }}</span>
-     · reported by {{ ticket.reporter.username }} on {{ ticket.created_at|date:"M d, Y" }}</p>
-  <p style="white-space:pre-wrap">{{ ticket.body }}</p>
+<div class="topbar">
+  <a class="ref-lg" href="{% url 'ticket_list' %}">← Queue</a>
+  <span class="ref-lg">/ DSK-{{ ticket.pk|stringformat:"04d" }}</span>
 </div>
+<main>
+  <div style="display:grid; grid-template-columns: 1fr 260px; gap: 22px; align-items: start;">
+    <!-- left: subject + conversation -->
+    <div>
+      <h1 style="font-size:22px; font-weight:680; letter-spacing:-0.4px; margin:0 0 6px;">{{ ticket.subject }}</h1>
+      <p class="hint" style="margin:0 0 22px;">
+        Opened by <strong>{{ ticket.reporter.get_full_name|default:ticket.reporter.username }}</strong>
+        on {{ ticket.created_at|date:"M j, Y · H:i" }}
+      </p>
 
-<div class="card">
-  <form method="post">
-    {% csrf_token %}
-    {{ uform.as_p }}
-    <button name="update">Update ticket</button>
-  </form>
-</div>
+      <div class="card"><div class="bd">
+        <div class="thread">
+          <div class="msg">
+            <div class="avatar">{{ ticket.reporter.username|first|upper }}</div>
+            <div>
+              <span class="who">{{ ticket.reporter.get_full_name|default:ticket.reporter.username }}</span>
+              <span class="when">· {{ ticket.created_at|date:"M j, H:i" }}</span>
+              <div class="text">{{ ticket.body|default:"(no message)" }}</div>
+            </div>
+          </div>
+          {% for c in comments %}
+          <div class="msg {% if c.internal %}note{% endif %}">
+            <div class="avatar">{{ c.author.username|first|upper }}</div>
+            <div>
+              <span class="who">{{ c.author.get_full_name|default:c.author.username }}</span>
+              {% if c.internal %}<span class="note-tag">Internal note</span>{% endif %}
+              <span class="when">· {{ c.created_at|date:"M j, H:i" }}</span>
+              <div class="text">{{ c.body }}</div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div></div>
 
-<h2>Conversation</h2>
-{% for c in comments %}
-  <div class="comment {% if c.internal %}internal{% endif %}">
-    <strong>{{ c.author.username }}</strong>
-    {% if c.internal %}<em>(internal)</em>{% endif %}
-    <small>{{ c.created_at|date:"M d, H:i" }}</small>
-    <p style="white-space:pre-wrap">{{ c.body }}</p>
+      <div class="card"><div class="bd">
+        <form method="post">
+          {% csrf_token %}
+          <div class="field">
+            <label for="id_body">Reply</label>
+            {{ cform.body }}
+          </div>
+          <div style="display:flex; align-items:center; gap:14px;">
+            <button class="btn" name="add_comment" value="1">Send reply</button>
+            <label style="display:flex; align-items:center; gap:7px; font-weight:500; color:var(--muted);">
+              {{ cform.internal }} Internal note (customer won't see this)
+            </label>
+          </div>
+        </form>
+      </div></div>
+    </div>
+
+    <!-- right: properties -->
+    <aside class="card">
+      <div class="hd">Properties</div>
+      <div class="bd">
+        <form method="post">
+          {% csrf_token %}
+          <div class="field"><label>Status</label>{{ uform.status }}</div>
+          <div class="field"><label>Priority</label>{{ uform.priority }}</div>
+          <div class="field"><label>Assignee</label>{{ uform.assignee }}</div>
+          <button class="btn ghost" name="update" value="1" style="width:100%; justify-content:center;">Save changes</button>
+        </form>
+        <div style="margin-top:18px; padding-top:16px; border-top:1px solid var(--line);">
+          <p class="hint" style="margin:0 0 4px;">Requester</p>
+          <p style="margin:0 0 12px;">{{ ticket.reporter.email|default:ticket.reporter.username }}</p>
+          <p class="hint" style="margin:0 0 4px;">Last activity</p>
+          <p style="margin:0;">{{ ticket.updated_at|date:"M j, Y · H:i" }}</p>
+        </div>
+      </div>
+    </aside>
   </div>
-{% empty %}
-  <p>No comments yet.</p>
-{% endfor %}
-
-<div class="card">
-  <form method="post">
-    {% csrf_token %}
-    {{ cform.as_p }}
-    <button name="add_comment">Add reply</button>
-  </form>
-</div>
+</main>
 {% endblock %}

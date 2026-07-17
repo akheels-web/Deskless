@@ -1,10 +1,11 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.mail import send_mail
+from django.core.paginator import Paginator
 from django.db.models import Avg, Count, F, Q
 from django.shortcuts import get_object_or_404, redirect, render
 
-from .forms import CommentForm, PublicTicketForm, TicketUpdateForm
+from .forms import AgentTicketForm, CommentForm, PublicTicketForm, TicketUpdateForm
 from .models import Ticket
 
 User = get_user_model()
@@ -16,18 +17,48 @@ User = get_user_model()
 def ticket_list(request):
     tickets = Ticket.objects.select_related("reporter", "assignee")
     status = request.GET.get("status")
+    mine = request.GET.get("mine")
+    query = request.GET.get("q", "")
     if status:
         tickets = tickets.filter(status=status)
-    if request.GET.get("mine"):
+    if mine:
         tickets = tickets.filter(assignee=request.user)
-    q = request.GET.get("q")
-    if q:
-        tickets = tickets.filter(Q(subject__icontains=q) | Q(body__icontains=q))
+    if query:
+        tickets = tickets.filter(Q(subject__icontains=query) | Q(body__icontains=query))
+
+    page_obj = Paginator(tickets, 25).get_page(request.GET.get("page"))
+    # querystring (minus page) so pager links keep the active filters
+    params = request.GET.copy()
+    params.pop("page", None)
+    qs = params.urlencode()
     return render(request, "tickets/list.html", {
-        "tickets": tickets,
+        "tickets": page_obj,
+        "page_obj": page_obj,
         "status_choices": Ticket.STATUS,
         "current_status": status,
+        "mine": mine,
+        "query": query,
+        "qs": qs + "&" if qs else "",
     })
+
+
+@login_required
+def ticket_new(request):
+    """Agent creates a ticket on a customer's behalf (phone/walk-in)."""
+    if request.method == "POST":
+        form = AgentTicketForm(request.POST)
+        if form.is_valid():
+            reporter, _ = User.objects.get_or_create(
+                username=form.cleaned_data["email"],
+                defaults={"email": form.cleaned_data["email"]},
+            )
+            ticket = form.save(commit=False)
+            ticket.reporter = reporter
+            ticket.save()
+            return redirect("ticket_detail", pk=ticket.pk)
+    else:
+        form = AgentTicketForm()
+    return render(request, "tickets/ticket_form.html", {"form": form})
 
 
 @login_required
@@ -68,17 +99,35 @@ def reports(request):
     resolved = qs.filter(status__in=["resolved", "closed"])
     avg_delta = resolved.aggregate(
         avg=Avg(F("updated_at") - F("created_at")))["avg"]
-    by_agent = (qs.filter(assignee__isnull=False)
-                .values("assignee__username")
-                .annotate(n=Count("id")).order_by("-n"))
+    by_agent = list(qs.filter(assignee__isnull=False)
+                    .values("assignee__username")
+                    .annotate(n=Count("id")).order_by("-n"))
+    status_rows = [(lbl, by_status.get(v, 0)) for v, lbl in Ticket.STATUS]
+    priority_rows = [(lbl, by_priority.get(v, 0)) for v, lbl in Ticket.PRIORITY]
+    # bar scaling maxes (avoid div-by-zero → min 1)
     return render(request, "tickets/reports.html", {
         "total": qs.count(),
-        "by_status": [(lbl, by_status.get(v, 0)) for v, lbl in Ticket.STATUS],
-        "by_priority": [(lbl, by_priority.get(v, 0)) for v, lbl in Ticket.PRIORITY],
+        "by_status": status_rows,
+        "by_priority": priority_rows,
         "open_count": by_status.get("open", 0) + by_status.get("pending", 0),
-        "avg_resolution": avg_delta,
+        "avg_resolution": _fmt_duration(avg_delta),
         "by_agent": by_agent,
+        "status_max": max([n for _, n in status_rows] + [1]),
+        "priority_max": max([n for _, n in priority_rows] + [1]),
+        "agent_max": max([r["n"] for r in by_agent] + [1]),
     })
+
+
+def _fmt_duration(delta):
+    """Human 'time to resolve' — avg_delta is a timedelta or None."""
+    if not delta:
+        return None
+    hours = delta.total_seconds() / 3600
+    if hours < 1:
+        return f"{round(hours * 60)}m"
+    if hours < 48:
+        return f"{round(hours)}h"
+    return f"{round(hours / 24)}d"
 
 
 # ---- Phase 3: public intake ----

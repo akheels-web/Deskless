@@ -1,29 +1,56 @@
 {% extends "base.html" %}
 {% block title %}Reports{% endblock %}
+{% block nav_reports %}active{% endblock %}
 {% block content %}
-<h1>Reports</h1>
-<div style="display:flex; gap:16px; flex-wrap:wrap">
-  <div class="card"><h2 style="margin:0">{{ total }}</h2><div>Total tickets</div></div>
-  <div class="card"><h2 style="margin:0">{{ open_count }}</h2><div>Open + pending</div></div>
-  <div class="card"><h2 style="margin:0">{{ avg_resolution|default:"—" }}</h2><div>Avg resolution time</div></div>
-</div>
+<div class="topbar"><h1>Reports</h1></div>
+<main>
+  <div class="tiles">
+    <div class="tile"><div class="n">{{ total }}</div><div class="k">Total tickets</div></div>
+    <div class="tile"><div class="n">{{ open_count }}</div><div class="k">Open &amp; pending</div></div>
+    <div class="tile"><div class="n">{{ avg_resolution|default:"—" }}</div><div class="k">Avg. time to resolve</div></div>
+  </div>
 
-<div class="card">
-  <h3>By status</h3>
-  <table>{% for label, n in by_status %}<tr><td>{{ label }}</td><td>{{ n }}</td></tr>{% endfor %}</table>
-</div>
+  <div class="row" style="align-items:start;">
+    <div class="card">
+      <div class="hd">By status</div>
+      <div class="bd">
+        {% for label, n in by_status %}
+        <div class="bar">
+          <span class="meta">{{ label }}</span>
+          <span class="track"><span class="fill" style="width:{% widthratio n status_max 100 %}%"></span></span>
+          <span class="val">{{ n }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
 
-<div class="card">
-  <h3>By priority</h3>
-  <table>{% for label, n in by_priority %}<tr><td>{{ label }}</td><td>{{ n }}</td></tr>{% endfor %}</table>
-</div>
+    <div class="card">
+      <div class="hd">By priority</div>
+      <div class="bd">
+        {% for label, n in by_priority %}
+        <div class="bar">
+          <span class="meta">{{ label }}</span>
+          <span class="track"><span class="fill" style="width:{% widthratio n priority_max 100 %}%"></span></span>
+          <span class="val">{{ n }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
 
-<div class="card">
-  <h3>By agent</h3>
-  <table>
-    <tr><th>Agent</th><th>Assigned</th></tr>
-    {% for row in by_agent %}<tr><td>{{ row.assignee__username }}</td><td>{{ row.n }}</td></tr>
-    {% empty %}<tr><td colspan="2">No assignments.</td></tr>{% endfor %}
-  </table>
-</div>
+  <div class="card">
+    <div class="hd">Workload by agent</div>
+    <div class="bd">
+      {% for row in by_agent %}
+      <div class="bar">
+        <span class="meta">{{ row.assignee__username }}</span>
+        <span class="track"><span class="fill" style="width:{% widthratio row.n agent_max 100 %}%"></span></span>
+        <span class="val">{{ row.n }}</span>
+      </div>
+      {% empty %}
+      <div class="empty">No tickets are assigned yet.</div>
+      {% endfor %}
+    </div>
+  </div>
+</main>
 {% endblock %}

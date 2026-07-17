@@ -28,3 +28,14 @@ class PublicTicketForm(forms.ModelForm):
         model = Ticket
         fields = ["subject", "body"]
         widgets = {"body": forms.Textarea(attrs={"rows": 6})}
+
+
+class AgentTicketForm(forms.ModelForm):
+    """Agent logs a ticket for a customer (phone/walk-in). Sets priority directly."""
+
+    email = forms.EmailField(label="Requester email")
+
+    class Meta:
+        model = Ticket
+        fields = ["subject", "body", "priority"]
+        widgets = {"body": forms.Textarea(attrs={"rows": 6})}
