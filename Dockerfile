@@ -12,4 +12,5 @@ COPY . .
 RUN SECRET_KEY=build DEBUG=False python manage.py collectstatic --noinput
 
 EXPOSE 8000
-CMD ["./entrypoint.sh"]
+# invoke via sh so a missing +x bit (e.g. Windows checkout) doesn't break startup
+CMD ["sh", "entrypoint.sh"]
