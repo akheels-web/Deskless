@@ -1,31 +1,40 @@
 services:
   db:
     image: postgres:16-alpine
+    restart: unless-stopped
+
     environment:
       POSTGRES_DB: helpdesk
       POSTGRES_USER: helpdesk
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-helpdesk}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - ./postgres:/var/lib/postgresql/data
+
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U helpdesk"]
       interval: 5s
       timeout: 3s
-      retries: 5
+      retries: 10
 
   web:
     build: .
-    env_file: .env
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
     environment:
-      DATABASE_URL: postgres://helpdesk:${DB_PASSWORD:-helpdesk}@db:5432/helpdesk
-    volumes:
-      - media:/app/media   # uploaded logos & attachments survive rebuilds
-    expose:
-      - "8000"             # Coolify/Traefik routes to this internally — no host port bind
+      DATABASE_URL: postgres://helpdesk:${DB_PASSWORD}@db:5432/helpdesk
+
     depends_on:
       db:
         condition: service_healthy
 
-volumes:
-  pgdata:
-  media:
+    volumes:
+      - ./media:/app/media
+
+    ports:
+      - "8000:8000"
+
+volumes: {}
