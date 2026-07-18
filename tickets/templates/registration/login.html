@@ -1,34 +1,39 @@
 {% extends "base.html" %}
 {% block title %}Sign in{% endblock %}
 {% block body %}
-<div class="public">
-  <div class="public-card">
-    <div class="public-brand">
-      {% if brand_logo %}
-        <img src="{{ brand_logo }}" alt="{{ brand_name }}" style="max-height:40px; max-width:220px; object-fit:contain;">
-      {% else %}
-        <svg width="28" height="28" viewBox="0 0 32 32" fill="none" aria-hidden="true">
-          <path d="M6 5h20a3 3 0 0 1 3 3v13a3 3 0 0 1-3 3H13l-7 5v-5a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3Z" stroke="{{ brand_color }}" stroke-width="2.2" stroke-linejoin="round"/>
-          <path d="M11 14.5l3.5 3.5L22 10.5" stroke="{{ brand_accent }}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        <strong>{{ brand_name }}</strong>
-      {% endif %}
+<div class="auth">
+  <div class="auth-card">
+    <!-- left: brand panel -->
+    <div class="auth-brandpane">
+      <h2>{{ brand_name }} support</h2>
+      <p>Your team's tickets, knowledge base, and customer conversations — organized in one place so nothing slips through.</p>
+      <div class="divider"></div>
+      <div class="art" aria-hidden="true">🎧</div>
     </div>
-    <div class="card"><div class="bd">
-      <h1>Sign in to {{ brand_name }}</h1>
-      <p class="lede">Agent access to the ticket queue.</p>
-      {% if form.errors %}<ul class="errorlist"><li>That username and password didn't match. Try again.</li></ul>{% endif %}
-      <form method="post" style="margin-top:16px;">
+
+    <!-- right: form panel -->
+    <div class="auth-formpane">
+      <h1>Hello again</h1>
+      <p class="sub">Sign in to your agent account.</p>
+      {% if form.errors %}<ul class="errorlist" style="margin-bottom:16px;"><li>That username and password didn't match. Try again.</li></ul>{% endif %}
+      <form method="post">
         {% csrf_token %}
-        <div class="field">
-          <label for="{{ form.username.id_for_label }}">Username</label>
-          {{ form.username }}
+        <div class="input-icon">
+          <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="6.5" r="3" stroke="currentColor" stroke-width="1.6"/><path d="M4 16.5a6 6 0 0 1 12 0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          <input type="text" name="username" id="{{ form.username.id_for_label }}" placeholder="Username" autocomplete="username" required autofocus>
         </div>
-        <div class="field">
-          <label for="{{ form.password.id_for_label }}">Password</label>
-          {{ form.password }}
+        <div class="input-icon">
+          <svg viewBox="0 0 20 20" fill="none"><rect x="4" y="9" width="12" height="8" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M7 9V6.5a3 3 0 0 1 6 0V9" stroke="currentColor" stroke-width="1.6"/></svg>
+          <input type="password" name="password" id="{{ form.password.id_for_label }}" placeholder="Password" autocomplete="current-password" required>
         </div>
-        <button class="btn" type="submit" style="width:100%; justify-content:center;">Sign in</button>
+        <div class="auth-row">
+          <label><input type="checkbox" name="remember" style="width:auto;"> Remember me</label>
+          <a href="{% url 'submit_ticket' %}">Forgot password?</a>
+        </div>
+        <button class="btn btn-arrow" type="submit">
+          <span>Sign in</span>
+          <svg viewBox="0 0 20 20" fill="none" width="18" height="18"><path d="M4 10h11M11 5l5 5-5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
       </form>
       {% if sso_providers %}
       <div class="sso-divider"><span>or continue with</span></div>
@@ -38,8 +43,8 @@
         {% endfor %}
       </div>
       {% endif %}
-    </div></div>
-    <p class="public-foot">Not an agent? <a href="{% url 'portal_home' %}">Visit the help center →</a></p>
+      <p class="public-foot" style="margin-top:22px;">Not an agent? <a href="{% url 'portal_home' %}">Visit the help center →</a></p>
+    </div>
   </div>
 </div>
 {% endblock %}

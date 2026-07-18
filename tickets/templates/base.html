@@ -247,6 +247,32 @@
     .public h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.4px; margin: 0 0 4px; }
     .public .lede { color: var(--muted); margin: 0 0 22px; }
     .public-foot { text-align: center; margin-top: 20px; color: var(--faint); font-size: 13px; }
+
+    /* ---- split login (two-panel) ---- */
+    .auth { min-height: 100vh; display: grid; place-items: center; padding: 24px;
+      background: color-mix(in srgb, var(--accent) 92%, #000); }
+    .auth-card { width: 100%; max-width: 940px; display: grid; grid-template-columns: 1fr 1fr;
+      background: var(--surface); border-radius: 18px; overflow: hidden; box-shadow: var(--shadow-lg); }
+    .auth-brandpane { position: relative; padding: 48px 40px; color: #fff; display: flex; flex-direction: column;
+      background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 88%, #000) 0%, color-mix(in srgb, var(--accent) 62%, #1a1f3a) 100%); }
+    .auth-brandpane h2 { font-size: 26px; font-weight: 720; letter-spacing: -0.6px; margin: 0 0 14px; }
+    .auth-brandpane p { color: rgba(255,255,255,.82); font-size: 13.5px; line-height: 1.6; margin: 0; max-width: 300px; }
+    .auth-brandpane .divider { width: 34px; height: 3px; border-radius: 3px; background: rgba(255,255,255,.5); margin: 22px 0; }
+    .auth-brandpane .art { margin-top: auto; text-align: center; font-size: 120px; line-height: 1; opacity: .95; }
+    .auth-formpane { padding: 48px 44px; display: flex; flex-direction: column; justify-content: center; }
+    .auth-formpane h1 { font-size: 24px; font-weight: 720; letter-spacing: -0.5px; margin: 0 0 6px; }
+    .auth-formpane .sub { color: var(--muted); font-size: 14px; margin: 0 0 26px; }
+    .input-icon { position: relative; margin-bottom: 16px; }
+    .input-icon input { width: 100%; padding: 13px 14px 13px 42px; border-radius: 10px; background: var(--canvas); border-color: transparent; }
+    .input-icon input:focus { background: var(--surface); }
+    .input-icon svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 17px; height: 17px; color: var(--faint); }
+    .auth-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; font-size: 13px; }
+    .auth-row label { display: flex; align-items: center; gap: 7px; color: var(--muted); font-weight: 500; }
+    .btn-arrow { width: 100%; justify-content: space-between; padding: 13px 18px; border-radius: 10px; font-size: 15px; }
+    @media (max-width: 720px) {
+      .auth-card { grid-template-columns: 1fr; max-width: 420px; }
+      .auth-brandpane { display: none; }
+    }
     .sso-divider { display: flex; align-items: center; gap: 12px; margin: 20px 0 14px; color: var(--faint); font-size: 12.5px; }
     .sso-divider::before, .sso-divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
     .sso-buttons { display: flex; flex-direction: column; gap: 8px; }
@@ -266,7 +292,10 @@
     .portal-nav .links a.on { color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, #fff); }
     .portal-nav .links a.btn { color: #fff; }
     .portal-nav .links a.btn:hover { color: #fff; background: var(--accent); }
-    .portal-wrap { max-width: 960px; margin: 0 auto; padding: 40px 24px 80px; }
+    .portal-wrap { max-width: 960px; margin: 0 auto; padding: 40px 24px 60px; }
+    .portal-foot { border-top: 1px solid var(--line); }
+    .portal-foot .inner { max-width: 960px; margin: 0 auto; padding: 20px 24px; display: flex; align-items: center; justify-content: space-between; color: var(--faint); font-size: 13px; }
+    .portal-foot a { color: var(--muted); }
 
     /* hero */
     .hero { text-align: center; padding: 40px 20px 8px;

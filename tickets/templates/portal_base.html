@@ -25,4 +25,10 @@
 <div class="portal-wrap">
   {% block portal %}{% endblock %}
 </div>
+<footer class="portal-foot">
+  <div class="inner">
+    <span>© {{ brand_name }}</span>
+    <a href="{% url 'login' %}">Agent sign-in →</a>
+  </div>
+</footer>
 {% endblock %}

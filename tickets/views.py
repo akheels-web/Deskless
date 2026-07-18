@@ -355,7 +355,9 @@ def kb_detail(request, slug):
 # ---- Customer portal ----
 
 def portal_home(request):
-    """Public help-center landing."""
+    """Public help-center landing. Staff go straight to their console (option B)."""
+    if request.user.is_authenticated and request.user.is_staff:
+        return redirect("dashboard")
     return render(request, "tickets/portal_home.html", {
         "articles": Article.objects.filter(published=True).select_related("category")[:5],
     })
