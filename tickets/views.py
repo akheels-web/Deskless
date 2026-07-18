@@ -6,8 +6,9 @@ from django.db.models import Avg, Count, F, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
-from .forms import (AgentTicketForm, CloseTicketForm, CommentForm, LinkTicketForm,
-                    NewUserForm, OrgSettingsForm, PublicTicketForm, TicketUpdateForm)
+from .forms import (AgentTicketForm, CategoryForm, CloseTicketForm, CommentForm,
+                    LinkTicketForm, NewUserForm, OrgSettingsForm, PublicTicketForm,
+                    TicketUpdateForm)
 from .models import (Article, Attachment, CannedReply, Category, OrgSettings,
                      Ticket, TicketEvent)
 from .signals import fire_webhooks
@@ -24,6 +25,22 @@ def log_event(ticket, actor, description):
     TicketEvent.objects.create(ticket=ticket, actor=actor, description=description)
 
 
+import re  # noqa: E402
+_MENTION_RE = re.compile(r"@([\w.@+-]+)")
+
+
+def _notify_mentions(ticket, comment, actor):
+    """B4: email any staff @mentioned in a comment, and record it."""
+    names = set(_MENTION_RE.findall(comment.body))
+    if not names:
+        return
+    mentioned = User.objects.filter(username__in=names, is_staff=True).exclude(pk=actor.pk)
+    from .notifications import notify_mention
+    for u in mentioned:
+        notify_mention(ticket, comment, u)
+        log_event(ticket, actor, f"mentioned {u.username}")
+
+
 User = get_user_model()
 admin_only = user_passes_test(lambda u: u.is_superuser)
 
@@ -32,17 +49,28 @@ admin_only = user_passes_test(lambda u: u.is_superuser)
 
 @login_required
 def dashboard(request):
+    from django.utils import timezone
+    now = timezone.now()
     qs = Ticket.objects.all()
+    open_qs = qs.exclude(status="closed")
     by_status = dict(qs.values_list("status").annotate(n=Count("id")))
-    mine = qs.filter(assignee=request.user).exclude(status="closed")
+    mine = open_qs.filter(assignee=request.user)
+    overdue = open_qs.filter(due_at__lt=now)
+    # unresolved by priority, for a small breakdown strip
+    by_prio = dict(open_qs.values_list("priority").annotate(n=Count("id")))
+    prio_rows = [(lbl, by_prio.get(v, 0)) for v, lbl in Ticket.PRIORITY]
     return render(request, "tickets/dashboard.html", {
         "open_count": sum(by_status.get(s, 0) for s in Ticket.OPEN_STATES),
         "escalated_count": by_status.get("escalated", 0),
         "closed_count": by_status.get("closed", 0),
-        "unassigned_count": qs.filter(assignee__isnull=True).exclude(status="closed").count(),
-        "mine": mine[:8],
+        "unassigned_count": open_qs.filter(assignee__isnull=True).count(),
+        "overdue_count": overdue.count(),
+        "mine": mine.order_by("due_at")[:8],
         "mine_count": mine.count(),
+        "due_soon": mine.filter(due_at__gte=now).order_by("due_at")[:5],
+        "overdue_list": overdue.select_related("reporter", "assignee").order_by("due_at")[:5],
         "recent": qs.select_related("reporter")[:6],
+        "prio_rows": prio_rows,
     })
 
 
@@ -129,6 +157,7 @@ def ticket_detail(request, pk):
                 c.save()
                 _save_attachments(ticket, files, request.user)
                 notify_reporter(ticket, c)
+                _notify_mentions(ticket, c, request.user)  # B4
             return redirect("ticket_detail", pk=pk)
         elif "link" in request.POST:  # F2: link another ticket
             lform = LinkTicketForm(request.POST)
@@ -284,14 +313,26 @@ def team(request):
 @admin_only
 def org_settings(request):
     org = OrgSettings.load()
+    form = OrgSettingsForm(instance=org)
+    cat_form = CategoryForm()
     if request.method == "POST":
-        form = OrgSettingsForm(request.POST, request.FILES, instance=org)
-        if form.is_valid():
-            form.save()
+        if "add_category" in request.POST:  # B2: create a category
+            cat_form = CategoryForm(request.POST)
+            if cat_form.is_valid():
+                cat_form.save()
+                return redirect("org_settings")
+        elif "delete_category" in request.POST:
+            Category.objects.filter(pk=request.POST["delete_category"]).delete()
             return redirect("org_settings")
-    else:
-        form = OrgSettingsForm(instance=org)
-    return render(request, "tickets/settings.html", {"form": form, "org": org})
+        else:
+            form = OrgSettingsForm(request.POST, request.FILES, instance=org)
+            if form.is_valid():
+                form.save()
+                return redirect("org_settings")
+    return render(request, "tickets/settings.html", {
+        "form": form, "org": org,
+        "cat_form": cat_form, "categories": Category.objects.all(),
+    })
 
 
 # ---- H4: bulk actions ----

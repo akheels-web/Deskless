@@ -80,6 +80,17 @@ def _absolute(path):
         return path
 
 
+def notify_mention(ticket, comment, user):
+    """B4: tell an agent they were @mentioned in a ticket note."""
+    if not user.email:
+        return
+    _send(
+        f"[Mention · DSK-{ticket.pk:04d}] {ticket.subject}",
+        f"{comment.author.username} mentioned you in an internal note:\n\n{comment.body}",
+        [user.email],
+    )
+
+
 def send_track_link(email, link):
     """P4: email a customer a signed link to view their tickets."""
     _send(

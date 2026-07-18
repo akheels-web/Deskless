@@ -1,9 +1,18 @@
 from django import forms
 from django.contrib.auth import get_user_model
 
-from .models import Comment, OrgSettings, Ticket
+from .models import Category, Comment, OrgSettings, Ticket
 
 User = get_user_model()
+
+
+class CategoryForm(forms.ModelForm):
+    """B2: create a category from the settings page."""
+
+    class Meta:
+        model = Category
+        fields = ["name"]
+        widgets = {"name": forms.TextInput(attrs={"placeholder": "e.g. Billing"})}
 
 
 class TicketUpdateForm(forms.ModelForm):
@@ -65,18 +74,38 @@ class LinkTicketForm(forms.Form):
     ticket_id = forms.IntegerField(label="Link ticket #", min_value=1)
 
 
+WEEKDAYS = [("0", "Monday"), ("1", "Tuesday"), ("2", "Wednesday"),
+            ("3", "Thursday"), ("4", "Friday"), ("5", "Saturday"), ("6", "Sunday")]
+
+
 class OrgSettingsForm(forms.ModelForm):
-    """F3: in-app branding."""
+    """F3: in-app branding. B3: weekday checkboxes + holidays."""
+
+    business_days = forms.MultipleChoiceField(
+        choices=WEEKDAYS, widget=forms.CheckboxSelectMultiple, required=False,
+        label="Working days")
 
     class Meta:
         model = OrgSettings
         fields = ["name", "logo", "color", "accent",
                   "sla_urgent", "sla_high", "sla_normal", "sla_low",
-                  "business_hours_enabled", "business_start", "business_end", "business_days"]
+                  "business_hours_enabled", "business_start", "business_end",
+                  "business_days", "holidays"]
         widgets = {
             "color": forms.TextInput(attrs={"type": "color"}),
             "accent": forms.TextInput(attrs={"type": "color"}),
+            "holidays": forms.Textarea(attrs={"rows": 4, "placeholder": "2026-12-25\n2026-01-01"}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # model stores "0,1,2,3,4" → checkbox list needs ["0","1",...]
+        if self.instance and self.instance.business_days:
+            self.initial["business_days"] = self.instance.business_days.split(",")
+
+    def clean_business_days(self):
+        # checkbox list → comma string for the CharField
+        return ",".join(self.cleaned_data["business_days"])
 
 
 class NewUserForm(forms.ModelForm):

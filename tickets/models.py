@@ -187,6 +187,8 @@ class OrgSettings(models.Model):
     business_days = models.CharField(
         default="0,1,2,3,4", max_length=13,
         help_text="Working weekdays, comma-separated (Mon=0 … Sun=6)")
+    holidays = models.TextField(
+        blank=True, help_text="Holiday dates (YYYY-MM-DD), one per line — excluded from SLA")
 
     class Meta:
         verbose_name = "Organization settings"
@@ -207,6 +209,10 @@ class OrgSettings(models.Model):
     def _work_days(self):
         return {int(d) for d in self.business_days.split(",") if d.strip().isdigit()}
 
+    def _holiday_set(self):
+        """Parse holidays textarea → set of 'YYYY-MM-DD' strings."""
+        return {line.strip() for line in self.holidays.splitlines() if line.strip()}
+
     def sla_deadline(self, start, priority):
         """Deadline = start + SLA hours, counting only business time if enabled."""
         hours = self.sla_hours(priority)
@@ -222,6 +228,7 @@ class OrgSettings(models.Model):
         """
         from datetime import timedelta
         work_days = self._work_days() or {0, 1, 2, 3, 4}
+        holidays = self._holiday_set()
         remaining = hours
         t = start
         guard = 0
@@ -229,7 +236,8 @@ class OrgSettings(models.Model):
             guard += 1
             if guard > 100000:  # safety: never spin forever on misconfig
                 break
-            if t.weekday() in work_days and self.business_start <= t.hour < self.business_end:
+            is_workday = t.weekday() in work_days and t.strftime("%Y-%m-%d") not in holidays
+            if is_workday and self.business_start <= t.hour < self.business_end:
                 remaining -= 1
             t += timedelta(hours=1)
         return t

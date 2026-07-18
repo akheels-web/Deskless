@@ -48,15 +48,47 @@
       <div class="row">
         <div class="field"><label for="{{ form.business_start.id_for_label }}">Start hour (0–23)</label>{{ form.business_start }}</div>
         <div class="field"><label for="{{ form.business_end.id_for_label }}">End hour (0–23)</label>{{ form.business_end }}</div>
-        <div class="field"><label for="{{ form.business_days.id_for_label }}">Work days</label>{{ form.business_days }}</div>
       </div>
-      <p class="hint" style="margin:-4px 0 0;">Work days: comma-separated, Mon=0 … Sun=6 (e.g. <code>0,1,2,3,4</code>).</p>
+      <div class="field">
+        <label>Working days</label>
+        <div class="weekday-grid">
+          {% for cb in form.business_days %}
+          <label class="weekday">{{ cb.tag }} {{ cb.choice_label }}</label>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="field">
+        <label for="{{ form.holidays.id_for_label }}">Holidays</label>
+        {{ form.holidays }}
+        <p class="hint" style="margin-top:6px;">One date per line (YYYY-MM-DD). These days never count toward SLA.</p>
+      </div>
 
       {{ form.errors }}
       <button class="btn" type="submit" style="margin-top:16px;">Save settings</button>
     </form>
   </div></div>
   <p class="hint" style="margin-top:12px;">Changes apply across the whole workspace immediately.</p>
+
+  <div class="card" style="margin-top:16px;"><div class="bd">
+    <strong>Categories</strong>
+    <p class="hint" style="margin:4px 0 14px;">Buckets for routing tickets (Billing, IT, Sales…).</p>
+    <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;">
+      {% for c in categories %}
+      <span class="tag" style="display:inline-flex; align-items:center; gap:6px; padding:5px 10px;">
+        {{ c.name }}
+        <form method="post" style="display:inline;">{% csrf_token %}
+          <button name="delete_category" value="{{ c.id }}" class="linkbtn" style="color:var(--faint);text-decoration:none;" title="Delete">×</button>
+        </form>
+      </span>
+      {% empty %}<span class="hint">No categories yet.</span>{% endfor %}
+    </div>
+    <form method="post" style="display:flex; gap:8px;">
+      {% csrf_token %}
+      {{ cat_form.name }}
+      <button class="btn" name="add_category" value="1">Add category</button>
+    </form>
+    {{ cat_form.name.errors }}
+  </div></div>
 
   <div class="card" style="margin-top:16px;"><div class="bd">
     <strong>Single sign-on (SSO)</strong>
