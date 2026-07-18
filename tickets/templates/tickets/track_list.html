@@ -1,0 +1,28 @@
+{% extends "portal_base.html" %}
+{% block title %}My tickets{% endblock %}
+{% block pnav_track %}on{% endblock %}
+{% block portal %}
+<h1 style="font-size:24px; font-weight:700; letter-spacing:-0.5px; margin:0 0 4px;">Your tickets</h1>
+<p class="hint" style="margin:0 0 22px;">Requests raised by {{ email }}.</p>
+
+<div class="card"><div class="bd" style="padding:6px 20px;">
+  {% for t in tickets %}
+  <div class="kb-item" style="cursor:default;">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <span class="ref">DSK-{{ t.pk|stringformat:"04d" }}</span>
+      <strong style="flex:1;">{{ t.subject }}</strong>
+      <span class="badge s-{{ t.status }}">{{ t.get_status_display }}</span>
+    </div>
+    <p class="hint" style="margin:6px 0 0;">
+      Opened {{ t.created_at|date:"M j, Y" }} · updated {{ t.updated_at|date:"M j, Y" }}
+      {% if t.status == "closed" and t.resolution %}<br><em>Resolution:</em> {{ t.resolution|truncatewords:30 }}{% endif %}
+    </p>
+  </div>
+  {% empty %}
+  <div class="empty">No tickets found for this email.</div>
+  {% endfor %}
+</div></div>
+<p class="hint" style="margin-top:16px; text-align:center;">
+  Need to add something? <a href="{% url 'submit_ticket' %}">Submit a new request</a> or reply to our email.
+</p>
+{% endblock %}

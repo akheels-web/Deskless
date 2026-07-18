@@ -1,0 +1,38 @@
+{% extends "portal_base.html" %}
+{% block title %}Help Center{% endblock %}
+{% block pnav_home %}on{% endblock %}
+{% block portal %}
+<div class="hero">
+  <h1>How can we help?</h1>
+  <p>Search our knowledge base, or reach our team directly — we're happy to help.</p>
+  <form class="search" method="get" action="{% url 'kb_list' %}">
+    <input type="search" name="q" placeholder="Search for answers…" aria-label="Search the knowledge base">
+  </form>
+</div>
+
+<div class="grid-2">
+  <a class="tilecard" href="{% url 'submit_ticket' %}">
+    <div class="ic">✉️</div>
+    <h3>Submit a request</h3>
+    <p>Can't find what you need? Send us the details and we'll get back to you by email.</p>
+  </a>
+  <a class="tilecard" href="{% url 'track_tickets' %}">
+    <div class="ic">🔎</div>
+    <h3>Track your tickets</h3>
+    <p>Check the status of a request you've already raised.</p>
+  </a>
+</div>
+
+{% if articles %}
+<div class="section-h">Popular articles</div>
+<div class="card"><div class="bd" style="padding:6px 20px;">
+  {% for a in articles %}
+  <a class="kb-item" href="{% url 'kb_detail' a.slug %}">
+    <strong>{{ a.title }}</strong>
+    {% if a.category %}<span class="tag" style="margin-left:6px;">{{ a.category.name }}</span>{% endif %}
+    <p class="hint" style="margin:4px 0 0;">{{ a.body|striptags|truncatewords:20 }}</p>
+  </a>
+  {% endfor %}
+</div></div>
+{% endif %}
+{% endblock %}

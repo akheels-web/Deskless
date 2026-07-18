@@ -78,3 +78,13 @@ def _absolute(path):
         return f"https://{Site.objects.get_current().domain}{path}"
     except Exception:
         return path
+
+
+def send_track_link(email, link):
+    """P4: email a customer a signed link to view their tickets."""
+    _send(
+        "Your support tickets",
+        f"Here's a secure link to view your support tickets:\n\n{link}\n\n"
+        f"The link works for 7 days. If you didn't request it, you can ignore this email.",
+        [email],
+    )

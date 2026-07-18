@@ -1,0 +1,30 @@
+{% extends "portal_base.html" %}
+{% block title %}Track your tickets{% endblock %}
+{% block pnav_track %}on{% endblock %}
+{% block portal %}
+<div style="max-width:480px; margin:24px auto 0;">
+  <h1 style="font-size:24px; font-weight:700; letter-spacing:-0.5px; margin:0 0 6px;">Track your tickets</h1>
+  <p class="hint" style="margin:0 0 22px;">Enter your email and we'll send you a secure link to view your requests.</p>
+  <div class="card"><div class="bd" style="padding:26px;">
+    {% if expired %}
+      <div class="errorlist" style="margin-bottom:16px;">That link has expired. Request a fresh one below.</div>
+    {% endif %}
+    {% if sent %}
+      <div style="text-align:center; padding:12px 0;">
+        <div class="avatar" style="margin:0 auto 14px; width:46px; height:46px; background:var(--green); font-size:20px;">✓</div>
+        <p style="margin:0; font-weight:600;">Check your inbox</p>
+        <p class="hint" style="margin:6px 0 0;">If we have tickets for that email, a link is on its way. It's valid for 7 days.</p>
+      </div>
+    {% else %}
+      <form method="post">
+        {% csrf_token %}
+        <div class="field">
+          <label for="track-email">Email address</label>
+          <input type="email" name="email" id="track-email" required placeholder="you@example.com">
+        </div>
+        <button class="btn" type="submit" style="width:100%; justify-content:center;">Email me a link</button>
+      </form>
+    {% endif %}
+  </div></div>
+</div>
+{% endblock %}

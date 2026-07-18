@@ -1,15 +1,17 @@
-{% extends "base.html" %}
+{% extends "portal_base.html" %}
 {% block title %}{{ article.title }}{% endblock %}
-{% block body %}
-<div class="public" style="align-items:flex-start;">
-  <div class="public-card" style="max-width:720px; margin-top:40px;">
-    <p style="margin-bottom:12px;"><a href="{% url 'kb_list' %}">← All articles</a></p>
-    <div class="card"><div class="bd">
-      <h1>{{ article.title }}</h1>
-      {% if article.category %}<span class="tag">{{ article.category.name }}</span>{% endif %}
-      <div class="text" style="margin-top:16px; white-space:pre-wrap;">{{ article.body|safe }}</div>
-    </div></div>
-    <p class="hint" style="margin-top:14px;">Didn't find your answer? <a href="{% url 'submit_ticket' %}">Contact support</a>.</p>
-  </div>
+{% block pnav_kb %}on{% endblock %}
+{% block portal %}
+<div style="max-width:720px; margin:0 auto;">
+  <p style="margin:0 0 16px;"><a href="{% url 'kb_list' %}">← All articles</a></p>
+  <div class="card"><div class="bd" style="padding:32px;">
+    <h1 style="font-size:26px; font-weight:700; letter-spacing:-0.6px; margin:0 0 10px;">{{ article.title }}</h1>
+    {% if article.category %}<span class="tag">{{ article.category.name }}</span>{% endif %}
+    <div class="text" style="margin-top:20px; white-space:pre-wrap; font-size:15px; line-height:1.7;">{{ article.body|safe }}</div>
+  </div></div>
+  <div class="card" style="margin-top:16px; text-align:center;"><div class="bd">
+    <p style="margin:0 0 12px; font-weight:550;">Still need help?</p>
+    <a class="btn" href="{% url 'submit_ticket' %}">Submit a request</a>
+  </div></div>
 </div>
 {% endblock %}

@@ -4,6 +4,7 @@ from django.core.mail import send_mail
 from django.core.paginator import Paginator
 from django.db.models import Avg, Count, F, Q
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 
 from .forms import (AgentTicketForm, CloseTicketForm, CommentForm, LinkTicketForm,
                     NewUserForm, OrgSettingsForm, PublicTicketForm, TicketUpdateForm)
@@ -349,3 +350,49 @@ def kb_list(request):
 def kb_detail(request, slug):
     article = get_object_or_404(Article, slug=slug, published=True)
     return render(request, "tickets/kb_detail.html", {"article": article})
+
+
+# ---- Customer portal ----
+
+def portal_home(request):
+    """Public help-center landing."""
+    return render(request, "tickets/portal_home.html", {
+        "articles": Article.objects.filter(published=True).select_related("category")[:5],
+    })
+
+
+# ---- P4: magic-link ticket tracking ----
+# ponytail: sign the email into a link with django's signer — no token model,
+# no password. Link expires via max_age at verification time.
+from django.core import signing  # noqa: E402
+
+TRACK_SALT = "deskless.track"
+
+
+def track_tickets(request):
+    """Customer enters email → we email them a signed link to their tickets."""
+    sent = False
+    if request.method == "POST":
+        email = request.POST.get("email", "").strip().lower()
+        if email:
+            # Only email a link if they actually have tickets — avoids confirming
+            # nothing, and prevents using us as an open relay to arbitrary addresses.
+            if Ticket.objects.filter(reporter__email__iexact=email).exists():
+                token = signing.dumps(email, salt=TRACK_SALT)
+                link = request.build_absolute_uri(
+                    reverse("track_view", args=[token]))
+                from .notifications import send_track_link
+                send_track_link(email, link)
+            sent = True  # always show the same confirmation
+    return render(request, "tickets/track.html", {"sent": sent})
+
+
+def track_view(request, token):
+    """Show the tickets for the email encoded in a signed, time-limited link."""
+    try:
+        email = signing.loads(token, salt=TRACK_SALT, max_age=60 * 60 * 24 * 7)  # 7 days
+    except signing.BadSignature:
+        return render(request, "tickets/track.html", {"expired": True})
+    tickets = (Ticket.objects.filter(reporter__email__iexact=email)
+               .order_by("-updated_at"))
+    return render(request, "tickets/track_list.html", {"tickets": tickets, "email": email})
