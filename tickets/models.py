@@ -21,6 +21,21 @@ class Category(models.Model):
         return self.name
 
 
+class Group(models.Model):
+    """C1: a team of agents (Networking, Support…). Tickets can be assigned to a group."""
+
+    name = models.CharField(max_length=80, unique=True)
+    members = models.ManyToManyField(
+        settings.AUTH_USER_MODEL, blank=True, related_name="ticket_groups",
+        limit_choices_to={"is_staff": True})
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
 class Tag(models.Model):
     """Freeform label for cross-cutting themes (vip, bug, refund…)."""
 
@@ -75,6 +90,8 @@ class Ticket(models.Model):
     # G1: routing & labels
     category = models.ForeignKey(
         Category, on_delete=models.SET_NULL, null=True, blank=True, related_name="tickets")
+    group = models.ForeignKey(  # C1: owning team
+        "Group", on_delete=models.SET_NULL, null=True, blank=True, related_name="tickets")
     tags = models.ManyToManyField(Tag, blank=True, related_name="tickets")
 
     # R3: SLA — resolution deadline computed from priority at creation.
@@ -256,6 +273,33 @@ class Webhook(models.Model):
 
     def __str__(self):
         return f"{self.event} → {self.url}"
+
+
+class Trigger(models.Model):
+    """C2: on new-ticket, if the keyword appears in subject/body, apply routing.
+    ponytail: simple keyword-contains rule. Add regex/AND-OR conditions only if
+    a client outgrows plain keywords.
+    """
+
+    name = models.CharField(max_length=100)
+    keyword = models.CharField(max_length=100, help_text="Case-insensitive text to match in subject or body")
+    set_group = models.ForeignKey(
+        Group, on_delete=models.SET_NULL, null=True, blank=True,
+        help_text="Assign matching tickets to this group")
+    set_priority = models.CharField(
+        max_length=10, blank=True, choices=Ticket.PRIORITY,
+        help_text="Optionally force a priority")
+    active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return f"{self.name} (~{self.keyword})"
+
+    def matches(self, ticket):
+        text = f"{ticket.subject}\n{ticket.body}".lower()
+        return self.keyword.lower() in text
 
 
 class TicketEvent(models.Model):

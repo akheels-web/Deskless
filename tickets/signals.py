@@ -83,6 +83,11 @@ def on_ticket_created(sender, instance, created, **kwargs):
     if not created:
         return
 
+    from .models import OrgSettings, Trigger, TicketEvent
+
+    # C5: record creation in the audit trail.
+    TicketEvent.objects.create(ticket=instance, actor=None, description="ticket created")
+
     # AI triage: only override the default priority, respect explicit choices.
     if instance.priority == "normal":
         text = f"{instance.subject}\n{instance.body}"
@@ -90,13 +95,26 @@ def on_ticket_created(sender, instance, created, **kwargs):
         if priority != instance.priority:
             instance.priority = priority
 
+    # C2: triggers — first matching active trigger sets group/priority.
+    group_id = instance.group_id
+    for trig in Trigger.objects.filter(active=True):
+        if trig.matches(instance):
+            if trig.set_group_id:
+                group_id = trig.set_group_id
+            if trig.set_priority:
+                instance.priority = trig.set_priority
+            TicketEvent.objects.create(
+                ticket=instance, actor=None, description=f"trigger '{trig.name}' applied")
+            break  # ponytail: first match wins; add ordering field if priority needed
+
     # R3/H1: SLA deadline from the (possibly triaged) priority, business-hours aware.
-    from .models import OrgSettings
     org = OrgSettings.load()
     due = org.sla_deadline(instance.created_at, instance.priority)
 
-    Ticket.objects.filter(pk=instance.pk).update(priority=instance.priority, due_at=due)
+    Ticket.objects.filter(pk=instance.pk).update(
+        priority=instance.priority, due_at=due, group_id=group_id)
     instance.due_at = due
+    instance.group_id = group_id
 
     fire_webhooks("ticket.created", instance)
     from .notifications import notify_new_ticket

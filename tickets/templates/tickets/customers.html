@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Customers{% endblock %}
+{% block nav_customers %}active{% endblock %}
+{% block content %}
+<div class="topbar"><h1>Customers</h1></div>
+<main>
+  {% if added is not None %}<div class="card" style="margin-bottom:16px; border-color:var(--green);"><div class="bd" style="color:var(--green);">Added {{ added }} customer{{ added|pluralize }}.</div></div>{% endif %}
+  <div class="row" style="align-items:start;">
+    <div class="card" style="flex:2 1 340px;">
+      <div class="hd">People</div>
+      <table class="queue" style="border:0; border-radius:0;">
+        <thead><tr><th>Name</th><th>Email</th><th>Joined</th></tr></thead>
+        <tbody>
+          {% for u in customers %}
+          <tr><td class="subj">{{ u.get_full_name|default:"—" }}</td><td class="meta">{{ u.email|default:u.username }}</td><td class="meta">{{ u.date_joined|date:"M j, Y" }}</td></tr>
+          {% empty %}<tr><td colspan="3"><div class="empty">No customers yet.</div></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div style="flex:1 1 260px;">
+      <div class="card"><div class="bd">
+        <strong>Add a customer</strong>
+        <form method="post" style="margin-top:12px;">
+          {% csrf_token %}
+          <div class="field"><label>Name</label>{{ form.name }}</div>
+          <div class="field"><label>Email</label>{{ form.email }}{{ form.email.errors }}</div>
+          <button class="btn" name="add_one" value="1" style="width:100%; justify-content:center;">Add customer</button>
+        </form>
+      </div></div>
+      <div class="card"><div class="bd">
+        <strong>Bulk add (CSV)</strong>
+        <form method="post" style="margin-top:12px;">
+          {% csrf_token %}
+          <div class="field">{{ bulk_form.csv }}<p class="hint" style="margin-top:5px;">One per line: <code>email,name</code></p></div>
+          <button class="btn ghost" name="add_bulk" value="1" style="width:100%; justify-content:center;">Import</button>
+        </form>
+      </div></div>
+    </div>
+  </div>
+</main>
+{% endblock %}

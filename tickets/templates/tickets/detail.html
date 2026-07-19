@@ -6,7 +6,7 @@
   <span class="ref-lg">/ DSK-{{ ticket.pk|stringformat:"04d" }}</span>
 </div>
 <main>
-  <div style="display:grid; grid-template-columns: 1fr 260px; gap: 22px; align-items: start;">
+  <div class="detail-grid">
     <!-- left: subject + conversation -->
     <div>
       <h1 style="font-size:22px; font-weight:680; letter-spacing:-0.4px; margin:0 0 6px;">{{ ticket.subject }}</h1>
@@ -111,6 +111,7 @@
             {% csrf_token %}
             <div class="field"><label>Status</label>{{ uform.status }}</div>
             <div class="field"><label>Priority</label>{{ uform.priority }}</div>
+            <div class="field"><label>Group</label>{{ uform.group }}</div>
             <div class="field"><label>Assignee</label>{{ uform.assignee }}</div>
             <div class="field"><label>Category</label>{{ uform.category }}</div>
             <div class="field"><label>Tags</label>{{ uform.tags }}</div>
@@ -147,7 +148,7 @@
           {% empty %}
           <p class="hint" style="margin:0 0 12px;">No linked tickets. Link related issues so they resolve together.</p>
           {% endfor %}
-          <form method="post" style="display:flex; gap:6px; margin-top:6px;">
+          <form method="post" class="link-form" style="margin-top:6px;">
             {% csrf_token %}
             {{ link_form.ticket_id }}
             <button class="btn ghost" name="link" value="1">Link</button>

@@ -28,6 +28,14 @@ CSRF_TRUSTED_ORIGINS = [
     o for o in os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',') if o
 ]
 
+# Baseline security headers (safe in dev and prod).
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = 'same-origin'
+X_FRAME_OPTIONS = 'DENY'
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SAMESITE = 'Lax'
+
 # HTTPS hardening — on in production, off in dev so http://localhost works.
 if not DEBUG:
     SECURE_SSL_REDIRECT = True
@@ -58,14 +66,23 @@ INSTALLED_APPS = [
     'allauth.socialaccount.providers.google',
     'allauth.socialaccount.providers.microsoft',
     'allauth.socialaccount.providers.zoho',
+    'axes',  # login rate-limiting / lockout
     'tickets',
 ]
 
 SITE_ID = 1
 AUTHENTICATION_BACKENDS = [
+    'axes.backends.AxesStandaloneBackend',  # must be first — throttles before auth
     'django.contrib.auth.backends.ModelBackend',
     'allauth.account.auth_backends.AuthenticationBackend',
 ]
+
+# S1: lock out an IP+username after repeated failed logins.
+AXES_FAILURE_LIMIT = 5
+AXES_COOLOFF_TIME = 1  # hours before auto-unlock
+AXES_LOCKOUT_PARAMETERS = [["ip_address", "username"]]
+AXES_RESET_ON_SUCCESS = True
+AXES_BEHIND_REVERSE_PROXY = not DEBUG  # trust X-Forwarded-For from Coolify/Traefik
 # ponytail: SSO users are agents by default via a signal (see tickets/signals.py).
 SOCIALACCOUNT_LOGIN_ON_GET = True  # skip allauth's confirm page → straight to provider
 
@@ -87,6 +104,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'allauth.account.middleware.AccountMiddleware',
+    'axes.middleware.AxesMiddleware',  # must be last
 ]
 
 ROOT_URLCONF = 'helpdesk.urls'

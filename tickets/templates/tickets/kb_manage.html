@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Knowledge base{% endblock %}
+{% block nav_kb %}active{% endblock %}
+{% block content %}
+<div class="topbar">
+  <h1>Knowledge base</h1>
+  <div class="grow"></div>
+  <a class="btn" href="{% url 'kb_new' %}">New article</a>
+</div>
+<main>
+  <div class="card"><table class="queue" style="border:0;">
+    <thead><tr><th>Title</th><th>Category</th><th>Status</th><th>Updated</th><th></th></tr></thead>
+    <tbody>
+      {% for a in articles %}
+      <tr>
+        <td class="subj">{{ a.title }}</td>
+        <td class="meta">{% if a.category %}{{ a.category.name }}{% else %}—{% endif %}</td>
+        <td>{% if a.published %}<span class="badge s-open">Published</span>{% else %}<span class="badge s-closed">Draft</span>{% endif %}</td>
+        <td class="meta">{{ a.updated_at|date:"M j, Y" }}</td>
+        <td><a href="{% url 'kb_edit' a.pk %}">Edit</a></td>
+      </tr>
+      {% empty %}<tr><td colspan="5"><div class="empty">No articles yet. Create your first one.</div></td></tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+</main>
+{% endblock %}

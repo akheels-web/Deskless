@@ -184,18 +184,23 @@ def ticket_detail(request, pk):
         else:  # properties update
             prev = {"status": ticket.get_status_display(),
                     "priority": ticket.get_priority_display(),
-                    "assignee": ticket.assignee_id}
+                    "assignee": ticket.assignee_id, "group": ticket.group_id,
+                    "ever_assigned": ticket.events.filter(description__startswith="assigned to").exists()}
             uform = TicketUpdateForm(request.POST, instance=ticket)
             if uform.is_valid():
                 ticket = uform.save()
-                # H2: record what actually changed
+                # H2/C5: record what actually changed
                 if ticket.get_status_display() != prev["status"]:
                     log_event(ticket, request.user, f"changed status to {ticket.get_status_display()}")
                 if ticket.get_priority_display() != prev["priority"]:
                     log_event(ticket, request.user, f"set priority to {ticket.get_priority_display()}")
+                if ticket.group_id != prev["group"]:
+                    log_event(ticket, request.user,
+                              f"routed to group {ticket.group.name if ticket.group_id else 'none'}")
                 if ticket.assignee_id != prev["assignee"]:
                     who = ticket.assignee.username if ticket.assignee_id else "nobody"
-                    log_event(ticket, request.user, f"assigned to {who}")
+                    first = "" if prev["ever_assigned"] else " (first assignee)"
+                    log_event(ticket, request.user, f"assigned to {who}{first}")
                     if ticket.assignee_id:
                         from .notifications import notify_assignment
                         notify_assignment(ticket)  # R3: email newly-assigned agent
@@ -308,6 +313,71 @@ def team(request):
     })
 
 
+# ---- C3: customer management (admins only) ----
+
+@admin_only
+def customers(request):
+    from .forms import BulkCustomerForm, NewCustomerForm
+    form = NewCustomerForm()
+    bulk_form = BulkCustomerForm()
+    added = None
+    if request.method == "POST":
+        if "add_one" in request.POST:
+            form = NewCustomerForm(request.POST)
+            if form.is_valid():
+                form.save()
+                return redirect("customers")
+        elif "add_bulk" in request.POST:
+            bulk_form = BulkCustomerForm(request.POST)
+            if bulk_form.is_valid():
+                added = _bulk_create_customers(bulk_form.cleaned_data["csv"])
+    # non-staff users are customers
+    people = User.objects.filter(is_staff=False).order_by("-date_joined")[:100]
+    return render(request, "tickets/customers.html", {
+        "form": form, "bulk_form": bulk_form, "customers": people, "added": added,
+    })
+
+
+def _bulk_create_customers(text):
+    """Create customers from 'email,name' lines. Returns count created."""
+    import csv as csvmod
+    import io
+    created = 0
+    for row in csvmod.reader(io.StringIO(text)):
+        if not row:
+            continue
+        email = row[0].strip().lower()
+        name = row[1].strip() if len(row) > 1 else ""
+        if "@" not in email or User.objects.filter(username=email).exists():
+            continue  # skip invalid/dupes silently — report count only
+        User.objects.create_user(username=email, email=email, first_name=name)
+        created += 1
+    return created
+
+
+# ---- C4: knowledge-base authoring (admins only) ----
+
+@admin_only
+def kb_edit(request, pk=None):
+    from .forms import ArticleForm
+    article = get_object_or_404(Article, pk=pk) if pk else None
+    if request.method == "POST":
+        form = ArticleForm(request.POST, instance=article)
+        if form.is_valid():
+            form.save()
+            return redirect("kb_manage")
+    else:
+        form = ArticleForm(instance=article)
+    return render(request, "tickets/kb_edit.html", {"form": form, "article": article})
+
+
+@admin_only
+def kb_manage(request):
+    return render(request, "tickets/kb_manage.html", {
+        "articles": Article.objects.select_related("category").all(),
+    })
+
+
 # ---- F3: org settings + logo (admins only) ----
 
 @admin_only
@@ -396,8 +466,9 @@ def kb_detail(request, slug):
 # ---- Customer portal ----
 
 def portal_home(request):
-    """Public help-center landing. Staff go straight to their console (option B)."""
-    if request.user.is_authenticated and request.user.is_staff:
+    """Public help-center landing. Staff go straight to their console (option B),
+    unless they explicitly asked to preview the portal (?preview=1)."""
+    if request.user.is_authenticated and request.user.is_staff and not request.GET.get("preview"):
         return redirect("dashboard")
     return render(request, "tickets/portal_home.html", {
         "articles": Article.objects.filter(published=True).select_related("category")[:5],

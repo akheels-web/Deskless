@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 from .models import (Article, Attachment, CannedReply, Category, Comment,
-                     OrgSettings, Tag, Ticket, TicketEvent, Webhook)
+                     Group, OrgSettings, Tag, Ticket, TicketEvent, Trigger, Webhook)
 
 
 class CommentInline(admin.TabularInline):
@@ -26,6 +26,18 @@ class TicketAdmin(admin.ModelAdmin):
 
 admin.site.register(Category)
 admin.site.register(Tag)
+
+
+@admin.register(Group)
+class GroupAdmin(admin.ModelAdmin):
+    list_display = ("name",)
+    filter_horizontal = ("members",)
+
+
+@admin.register(Trigger)
+class TriggerAdmin(admin.ModelAdmin):
+    list_display = ("name", "keyword", "set_group", "set_priority", "active")
+    list_filter = ("active",)
 
 
 @admin.register(CannedReply)

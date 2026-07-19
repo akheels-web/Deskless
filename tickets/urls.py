@@ -20,5 +20,9 @@ urlpatterns = [
     path("bulk/", views.ticket_bulk, name="ticket_bulk"),
     path("reports/", views.reports, name="reports"),
     path("team/", views.team, name="team"),
+    path("customers/", views.customers, name="customers"),
+    path("kb-admin/", views.kb_manage, name="kb_manage"),
+    path("kb-admin/new/", views.kb_edit, name="kb_new"),
+    path("kb-admin/<int:pk>/", views.kb_edit, name="kb_edit"),
     path("settings/", views.org_settings, name="org_settings"),
 ]

@@ -20,7 +20,7 @@ class TicketUpdateForm(forms.ModelForm):
 
     class Meta:
         model = Ticket
-        fields = ["status", "priority", "assignee", "category", "tags"]
+        fields = ["status", "priority", "assignee", "group", "category", "tags"]
         widgets = {"tags": forms.CheckboxSelectMultiple}
 
 
@@ -124,3 +124,39 @@ class NewUserForm(forms.ModelForm):
         if commit:
             user.save()
         return user
+
+
+class NewCustomerForm(forms.Form):
+    """C3: admin adds one customer (a non-staff user)."""
+
+    name = forms.CharField(max_length=150, required=False)
+    email = forms.EmailField()
+
+    def clean_email(self):
+        email = self.cleaned_data["email"].lower()
+        if User.objects.filter(username=email).exists():
+            raise forms.ValidationError("A user with that email already exists.")
+        return email
+
+    def save(self):
+        d = self.cleaned_data
+        return User.objects.create_user(
+            username=d["email"], email=d["email"], first_name=d.get("name", ""))
+
+
+class BulkCustomerForm(forms.Form):
+    """C3: paste CSV — 'email,name' per line — to create many customers."""
+
+    csv = forms.CharField(
+        widget=forms.Textarea(attrs={"rows": 6, "placeholder": "jane@acme.com,Jane Doe\nbob@acme.com,Bob"}),
+        help_text="One per line: email,name")
+
+
+class ArticleForm(forms.ModelForm):
+    """C4: author a knowledge-base article from the console."""
+
+    class Meta:
+        from .models import Article
+        model = Article
+        fields = ["title", "slug", "category", "body", "published"]
+        widgets = {"body": forms.Textarea(attrs={"rows": 12})}

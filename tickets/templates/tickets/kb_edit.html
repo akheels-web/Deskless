@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}{% if article %}Edit article{% else %}New article{% endif %}{% endblock %}
+{% block nav_kb %}active{% endblock %}
+{% block content %}
+<div class="topbar">
+  <a class="ref-lg" href="{% url 'kb_manage' %}">← Knowledge base</a>
+  <span class="ref-lg">/ {% if article %}Edit{% else %}New{% endif %}</span>
+</div>
+<main style="max-width:720px;">
+  <div class="card"><div class="bd">
+    <form method="post">
+      {% csrf_token %}
+      <div class="field"><label for="{{ form.title.id_for_label }}">Title</label>{{ form.title }}{{ form.title.errors }}</div>
+      <div class="row">
+        <div class="field"><label for="{{ form.slug.id_for_label }}">Slug (URL)</label>{{ form.slug }}{{ form.slug.errors }}</div>
+        <div class="field"><label for="{{ form.category.id_for_label }}">Category</label>{{ form.category }}</div>
+      </div>
+      <div class="field"><label for="{{ form.body.id_for_label }}">Body</label>{{ form.body }}{{ form.body.errors }}</div>
+      <label style="display:flex; gap:8px; align-items:center; margin-bottom:16px; font-weight:500;">
+        {{ form.published }} Published (visible in the customer portal)
+      </label>
+      <button class="btn" type="submit">Save article</button>
+    </form>
+  </div></div>
+</main>
+{% endblock %}

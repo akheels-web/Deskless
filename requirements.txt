@@ -8,3 +8,4 @@ Pillow==12.3.0
 django-allauth==65.18.0
 requests==2.34.2
 PyJWT[crypto]==2.13.0
+django-axes==8.3.1
