@@ -7,7 +7,7 @@
 
 <div class="card"><div class="bd" style="padding:6px 20px;">
   {% for t in tickets %}
-  <div class="kb-item" style="cursor:default;">
+  <a class="kb-item" {% if t.csat_token %}href="{% url 'ticket_status' t.csat_token %}"{% endif %}>
     <div style="display:flex; align-items:center; gap:10px;">
       <span class="ref">DSK-{{ t.pk|stringformat:"04d" }}</span>
       <strong style="flex:1;">{{ t.subject }}</strong>
@@ -17,7 +17,7 @@
       Opened {{ t.created_at|date:"M j, Y" }} · updated {{ t.updated_at|date:"M j, Y" }}
       {% if t.status == "closed" and t.resolution %}<br><em>Resolution:</em> {{ t.resolution|truncatewords:30 }}{% endif %}
     </p>
-  </div>
+  </a>
   {% empty %}
   <div class="empty">No tickets found for this email.</div>
   {% endfor %}

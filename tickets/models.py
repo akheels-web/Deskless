@@ -54,10 +54,12 @@ class Ticket(models.Model):
         ("open", "Open"),
         ("in_progress", "In Progress"),
         ("pending", "Pending"),
-        ("escalated", "Escalated"),
+        ("escalated", "Escalate"),
         ("closed", "Closed"),
     ]
     OPEN_STATES = ("open", "in_progress", "pending", "escalated")
+    # statuses that require a note (and, for escalate, a person) on transition
+    NOTE_REQUIRED = ("pending", "escalated", "closed")
     PRIORITY = [
         ("low", "Low"),
         ("normal", "Normal"),
@@ -98,10 +100,12 @@ class Ticket(models.Model):
     due_at = models.DateTimeField(null=True, blank=True)
     sla_breached = models.BooleanField(default=False)
     breach_notified = models.BooleanField(default=False)  # avoid re-emailing
+    paused_at = models.DateTimeField(null=True, blank=True)  # T2: set while pending
 
     # H3: CSAT — set when the requester rates a closed ticket.
     csat_rating = models.PositiveSmallIntegerField(null=True, blank=True)  # 1..5
     csat_token = models.CharField(max_length=32, blank=True, db_index=True)
+    closed_at = models.DateTimeField(null=True, blank=True)  # U3: reopen-window anchor
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -117,15 +121,37 @@ class Ticket(models.Model):
         return self.status in self.OPEN_STATES
 
     @property
+    def is_paused(self):
+        return self.paused_at is not None
+
+    @property
     def is_overdue(self):
         from django.utils import timezone
-        return bool(self.due_at and self.is_open and timezone.now() > self.due_at)
+        # T2: a paused (pending) ticket never counts as overdue
+        return bool(self.due_at and self.is_open and not self.is_paused
+                    and timezone.now() > self.due_at)
+
+    def pause_sla(self):
+        """T2: stop the SLA clock (entering pending)."""
+        from django.utils import timezone
+        if not self.paused_at:
+            self.paused_at = timezone.now()
+
+    def resume_sla(self):
+        """T2: push due_at forward by the paused duration, then clear the pause."""
+        from django.utils import timezone
+        if self.paused_at and self.due_at:
+            self.due_at = self.due_at + (timezone.now() - self.paused_at)
+        self.paused_at = None
 
     def close_with_resolution(self, resolution, cascade=True):
         """Close this ticket, and (F2) cascade-close every linked ticket still open."""
+        from django.utils import timezone
+        now = timezone.now()
         self.status = "closed"
         self.resolution = resolution
-        self.csat_token = self.csat_token or _new_token()  # H3: enable rating
+        self.csat_token = self.csat_token or _new_token()  # H3: enable rating + status link
+        self.closed_at = now
         self.save()
         if cascade:
             for t in self.related.filter(status__in=self.OPEN_STATES):
@@ -133,7 +159,17 @@ class Ticket(models.Model):
                 # note which ticket drove the cascade — the "resolution node"
                 t.resolution = resolution + f"\n\n(Closed with linked ticket #{self.pk}.)"
                 t.csat_token = t.csat_token or _new_token()
+                t.closed_at = now
                 t.save()
+
+    def can_reopen(self):
+        """U3: customer may reopen a closed ticket within the org's reopen window."""
+        from django.utils import timezone
+        from datetime import timedelta
+        if self.status != "closed" or not self.closed_at:
+            return False
+        days = OrgSettings.load().reopen_days
+        return days > 0 and timezone.now() <= self.closed_at + timedelta(days=days)
 
 
 class Comment(models.Model):
@@ -207,6 +243,10 @@ class OrgSettings(models.Model):
     holidays = models.TextField(
         blank=True, help_text="Holiday dates (YYYY-MM-DD), one per line — excluded from SLA")
 
+    # U3: how many days a customer may reopen a closed ticket (0 = never)
+    reopen_days = models.PositiveIntegerField(
+        default=3, help_text="Days a customer can reopen a closed ticket (0 disables)")
+
     class Meta:
         verbose_name = "Organization settings"
         verbose_name_plural = "Organization settings"
@@ -220,7 +260,26 @@ class OrgSettings(models.Model):
         obj, _ = cls.objects.get_or_create(pk=1)
         return obj
 
-    def sla_hours(self, priority):
+    def sla_hours(self, priority, group=None, category=None):
+        """U1: most-specific SLAPolicy wins (group+category > group > category),
+        else the global per-priority default.
+        """
+        policies = SLAPolicy.objects.filter(priority=priority)
+        best, best_score = None, -1
+        for p in policies:
+            if p.group_id and group is not None and p.group_id != getattr(group, "id", group):
+                continue
+            if p.category_id and category is not None and p.category_id != getattr(category, "id", category):
+                continue
+            if p.group_id and group is None:
+                continue
+            if p.category_id and category is None:
+                continue
+            score = (2 if p.group_id else 0) + (1 if p.category_id else 0)
+            if score > best_score:
+                best, best_score = p, score
+        if best:
+            return best.hours
         return getattr(self, f"sla_{priority}", self.sla_normal)
 
     def _work_days(self):
@@ -230,9 +289,9 @@ class OrgSettings(models.Model):
         """Parse holidays textarea → set of 'YYYY-MM-DD' strings."""
         return {line.strip() for line in self.holidays.splitlines() if line.strip()}
 
-    def sla_deadline(self, start, priority):
+    def sla_deadline(self, start, priority, group=None, category=None):
         """Deadline = start + SLA hours, counting only business time if enabled."""
-        hours = self.sla_hours(priority)
+        hours = self.sla_hours(priority, group=group, category=category)
         if not self.business_hours_enabled:
             from datetime import timedelta
             return start + timedelta(hours=hours)
@@ -258,6 +317,27 @@ class OrgSettings(models.Model):
                 remaining -= 1
             t += timedelta(hours=1)
         return t
+
+
+class SLAPolicy(models.Model):
+    """U1: per-group / per-category resolution target, overriding the global default.
+    Leave group/category blank to match any. Most-specific match wins (see sla_hours).
+    """
+
+    group = models.ForeignKey(
+        "Group", on_delete=models.CASCADE, null=True, blank=True, related_name="sla_policies")
+    category = models.ForeignKey(
+        Category, on_delete=models.CASCADE, null=True, blank=True, related_name="sla_policies")
+    priority = models.CharField(max_length=10, choices=Ticket.PRIORITY)
+    hours = models.PositiveIntegerField(help_text="Hours to resolve")
+
+    class Meta:
+        verbose_name_plural = "SLA policies"
+        ordering = ["group__name", "category__name", "priority"]
+
+    def __str__(self):
+        scope = self.group.name if self.group_id else (self.category.name if self.category_id else "Any")
+        return f"{scope} · {self.get_priority_display()} → {self.hours}h"
 
 
 class Webhook(models.Model):

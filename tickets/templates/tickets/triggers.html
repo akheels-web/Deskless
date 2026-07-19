@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Triggers{% endblock %}
+{% block nav_settings %}active{% endblock %}
+{% block content %}
+<div class="topbar">
+  <a class="ref-lg" href="{% url 'org_settings' %}">← Settings</a>
+  <span class="ref-lg">/ Triggers</span>
+</div>
+<main>
+  <div class="row" style="align-items:start;">
+    <div class="card" style="flex:2 1 380px;">
+      <div class="hd">Triggers</div>
+      <table class="queue" style="border:0; border-radius:0;">
+        <thead><tr><th>Name</th><th>Keyword</th><th>Routes to</th><th>Priority</th><th></th><th></th></tr></thead>
+        <tbody>
+          {% for t in triggers %}
+          <tr>
+            <td class="subj">{{ t.name }}</td>
+            <td><span class="tag">{{ t.keyword }}</span></td>
+            <td class="meta">{{ t.set_group.name|default:"—" }}</td>
+            <td class="meta">{{ t.get_set_priority_display|default:"—" }}</td>
+            <td>{% if t.active %}<span class="badge s-open">On</span>{% else %}<span class="badge s-closed">Off</span>{% endif %}</td>
+            <td style="text-align:right;">
+              <form method="post" onsubmit="return confirm('Delete trigger {{ t.name }}?');">{% csrf_token %}
+                <button name="delete_trigger" value="{{ t.id }}" class="linkbtn" style="color:var(--red);">Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% empty %}<tr><td colspan="6"><div class="empty">No triggers yet. Add one to auto-route tickets.</div></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="card" style="flex:1 1 300px;">
+      <div class="hd">New trigger</div>
+      <div class="bd">
+        <form method="post">
+          {% csrf_token %}
+          <div class="field"><label>Name</label>{{ form.name }}{{ form.name.errors }}</div>
+          <div class="field"><label>Keyword (in subject or body)</label>{{ form.keyword }}{{ form.keyword.errors }}</div>
+          <div class="field"><label>Assign to group</label>{{ form.set_group }}</div>
+          <div class="field"><label>Force priority (optional)</label>{{ form.set_priority }}</div>
+          <label style="display:flex; gap:8px; align-items:center; margin-bottom:16px; font-weight:500;">{{ form.active }} Active</label>
+          <button class="btn" type="submit" style="width:100%; justify-content:center;">Create trigger</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</main>
+{% endblock %}

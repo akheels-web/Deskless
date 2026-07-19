@@ -107,19 +107,33 @@
       <aside class="card">
         <div class="hd">Properties</div>
         <div class="bd">
+          {% if transition_error %}
+          <div class="errorlist" style="margin-bottom:12px; padding:9px 12px; background:var(--red-bg); border-radius:var(--radius-sm);">{{ transition_error }}</div>
+          {% endif %}
           <form method="post">
             {% csrf_token %}
             <div class="field"><label>Status</label>{{ uform.status }}</div>
-            <!-- #15 resolution note appears inline when Closed is chosen -->
-            <div class="field" id="resolution-field" style="display:none;">
-              <label for="id_resolution_note">Resolution note</label>
-              <textarea name="resolution_note" id="id_resolution_note" rows="3" placeholder="How was this resolved? Shared with the requester."></textarea>
-              {% if related %}
-              <label style="display:flex; gap:7px; align-items:center; margin-top:8px; font-weight:500; color:var(--muted);">
-                <input type="checkbox" name="cascade" checked style="width:auto;"> Also close {{ related|length }} linked ticket{{ related|length|pluralize }}
-              </label>
-              {% endif %}
+
+            <!-- T1: escalate person picker -->
+            <div class="field" id="escalate-field" style="display:none;">
+              <label for="escalate_to">Escalate to</label>
+              <select name="escalate_to" id="escalate_to">
+                <option value="">— choose an agent —</option>
+                {% for a in escalate_targets %}<option value="{{ a.id }}">{{ a.get_full_name|default:a.username }}</option>{% endfor %}
+              </select>
             </div>
+
+            <!-- T1/#15: note required for pending/escalate/closed -->
+            <div class="field" id="note-field" style="display:none;">
+              <label for="id_transition_note"><span id="note-label">Note</span> <span style="color:var(--red);">*</span></label>
+              <textarea name="transition_note" id="id_transition_note" rows="3"></textarea>
+              <div id="cascade-wrap" style="display:none;">
+                <label style="display:flex; gap:7px; align-items:center; margin-top:8px; font-weight:500; color:var(--muted);">
+                  <input type="checkbox" name="cascade" checked style="width:auto;"> Also close {{ related|length }} linked ticket{{ related|length|pluralize }}
+                </label>
+              </div>
+            </div>
+
             <div class="field"><label>Priority</label>{{ uform.priority }}</div>
             <div class="field"><label>Group</label>{{ uform.group }}</div>
             <div class="field"><label>Assignee</label>{{ uform.assignee }}</div>
@@ -130,9 +144,23 @@
           <script>
             (function () {
               var sel = document.getElementById('id_status');
-              var rf = document.getElementById('resolution-field');
-              if (!sel || !rf) return;
-              function sync() { rf.style.display = (sel.value === 'closed') ? 'block' : 'none'; }
+              var current = "{{ ticket.status }}";
+              var noteField = document.getElementById('note-field');
+              var noteLabel = document.getElementById('note-label');
+              var noteBox = document.getElementById('id_transition_note');
+              var escField = document.getElementById('escalate-field');
+              var cascade = document.getElementById('cascade-wrap');
+              var hasLinks = {{ related|length }} > 0;
+              var LABELS = {pending:'Reason for pending', escalated:'Reason for escalation', closed:'Resolution note'};
+              var PH = {pending:'Why is this waiting, and on what?', escalated:'Why escalate, and any context.', closed:'How was this resolved? Shared with the requester.'};
+              function sync() {
+                var v = sel.value, entering = (v !== current), need = entering && LABELS[v];
+                noteField.style.display = need ? 'block' : 'none';
+                escField.style.display = (entering && v === 'escalated') ? 'block' : 'none';
+                cascade.style.display = (entering && v === 'closed' && hasLinks) ? 'block' : 'none';
+                noteBox.required = !!need;
+                if (need) { noteLabel.textContent = LABELS[v]; noteBox.placeholder = PH[v]; }
+              }
               sel.addEventListener('change', sync); sync();
             })();
           </script>
@@ -144,7 +172,7 @@
             {% if ticket.due_at %}
             <p class="hint" style="margin:0 0 4px;">SLA due</p>
             <p style="margin:0; {% if ticket.is_overdue %}color:var(--red); font-weight:600;{% endif %}">
-              {{ ticket.due_at|date:"M j, Y · H:i" }}{% if ticket.is_overdue %} · overdue{% endif %}
+              {{ ticket.due_at|date:"M j, Y · H:i" }}{% if ticket.is_overdue %} · overdue{% elif ticket.is_paused %} · <span style="color:var(--amber);">paused</span>{% endif %}
             </p>
             {% endif %}
           </div>

@@ -19,6 +19,7 @@ class Command(BaseCommand):
             due_at__lt=now,
             status__in=Ticket.OPEN_STATES,
             breach_notified=False,
+            paused_at__isnull=True,  # T2: paused (pending) tickets don't breach
         )
         n = 0
         for ticket in overdue:

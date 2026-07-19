@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Groups{% endblock %}
+{% block nav_settings %}active{% endblock %}
+{% block content %}
+<div class="topbar">
+  <a class="ref-lg" href="{% url 'org_settings' %}">← Settings</a>
+  <span class="ref-lg">/ Groups</span>
+</div>
+<main>
+  <div class="row" style="align-items:start;">
+    <div class="card" style="flex:2 1 380px;">
+      <div class="hd">Groups</div>
+      <table class="queue" style="border:0; border-radius:0;">
+        <thead><tr><th>Name</th><th>Members</th><th></th></tr></thead>
+        <tbody>
+          {% for g in groups %}
+          <tr>
+            <td class="subj">{{ g.name }}</td>
+            <td class="meta">{% for m in g.members.all %}{{ m.username }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</td>
+            <td style="text-align:right;">
+              <form method="post" onsubmit="return confirm('Delete group {{ g.name }}?');">{% csrf_token %}
+                <button name="delete_group" value="{{ g.id }}" class="linkbtn" style="color:var(--red);">Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% empty %}<tr><td colspan="3"><div class="empty">No groups yet.</div></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="card" style="flex:1 1 280px;">
+      <div class="hd">New group</div>
+      <div class="bd">
+        <form method="post">
+          {% csrf_token %}
+          <div class="field"><label>Name</label>{{ form.name }}{{ form.name.errors }}</div>
+          <div class="field"><label>Members</label><div class="weekday-grid">
+            {% for cb in form.members %}<label class="weekday">{{ cb.tag }} {{ cb.choice_label }}</label>{% empty %}<span class="hint">No agents yet.</span>{% endfor %}
+          </div></div>
+          <button class="btn" type="submit" style="width:100%; justify-content:center;">Create group</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</main>
+{% endblock %}

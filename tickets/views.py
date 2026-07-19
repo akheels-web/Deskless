@@ -9,8 +9,8 @@ from django.urls import reverse
 from .forms import (AgentTicketForm, CategoryForm, CloseTicketForm, CommentForm,
                     LinkTicketForm, NewUserForm, OrgSettingsForm, PublicTicketForm,
                     TicketUpdateForm)
-from .models import (Article, Attachment, CannedReply, Category, OrgSettings,
-                     Ticket, TicketEvent)
+from .models import (Article, Attachment, CannedReply, Category, Comment,
+                     OrgSettings, Ticket, TicketEvent)
 from .signals import fire_webhooks
 
 
@@ -182,48 +182,106 @@ def ticket_detail(request, pk):
                 send_csat_request(ticket)  # H3: ask the requester to rate
             return redirect("ticket_detail", pk=pk)
         else:  # properties update
-            prev = {"status_val": ticket.status,
-                    "status": ticket.get_status_display(),
-                    "priority": ticket.get_priority_display(),
-                    "assignee": ticket.assignee_id, "group": ticket.group_id,
-                    "ever_assigned": ticket.events.filter(description__startswith="assigned to").exists()}
-            uform = TicketUpdateForm(request.POST, instance=ticket)
-            if uform.is_valid():
-                ticket = uform.save()
-                # #15: transitioning INTO closed → capture resolution + cascade + CSAT
-                if ticket.status == "closed" and prev["status_val"] != "closed":
-                    note = request.POST.get("resolution_note", "").strip() or "Closed by an agent."
-                    cascade = bool(request.POST.get("cascade"))
-                    ticket.close_with_resolution(note, cascade=cascade)
-                    log_event(ticket, request.user, "closed the ticket")
-                    fire_webhooks("ticket.closed", ticket)
-                    from .notifications import send_csat_request
-                    send_csat_request(ticket)
-                # H2/C5: record other status changes
-                elif ticket.get_status_display() != prev["status"]:
-                    log_event(ticket, request.user, f"changed status to {ticket.get_status_display()}")
-                if ticket.get_priority_display() != prev["priority"]:
-                    log_event(ticket, request.user, f"set priority to {ticket.get_priority_display()}")
-                if ticket.group_id != prev["group"]:
-                    log_event(ticket, request.user,
-                              f"routed to group {ticket.group.name if ticket.group_id else 'none'}")
-                if ticket.assignee_id != prev["assignee"]:
-                    who = ticket.assignee.username if ticket.assignee_id else "nobody"
-                    first = "" if prev["ever_assigned"] else " (first assignee)"
-                    log_event(ticket, request.user, f"assigned to {who}{first}")
-                    if ticket.assignee_id:
-                        from .notifications import notify_assignment
-                        notify_assignment(ticket)  # R3: email newly-assigned agent
+            error = _apply_ticket_update(request, ticket)
+            if error:
+                # re-render with the error and the attempted values
+                return render(request, "tickets/detail.html", _detail_ctx(
+                    request, ticket, comments, transition_error=error,
+                    uform=TicketUpdateForm(request.POST, instance=ticket)))
             return redirect("ticket_detail", pk=pk)
-    return render(request, "tickets/detail.html", {
+    return render(request, "tickets/detail.html", _detail_ctx(request, ticket, comments))
+
+
+def _detail_ctx(request, ticket, comments, transition_error=None, uform=None):
+    return {
         "ticket": ticket, "comments": comments,
-        "cform": CommentForm(), "uform": TicketUpdateForm(instance=ticket),
-        "close_form": CloseTicketForm(), "link_form": LinkTicketForm(),
+        "cform": CommentForm(), "uform": uform or TicketUpdateForm(instance=ticket),
+        "link_form": LinkTicketForm(),
         "related": ticket.related.all(),
+        "transition_error": transition_error,
+        "escalate_targets": User.objects.filter(is_staff=True, is_active=True).exclude(pk=ticket.assignee_id),
         "attachments": ticket.attachments.all(),
         "canned": CannedReply.objects.all(),
         "events": ticket.events.select_related("actor"),
-    })
+    }
+
+
+def _apply_ticket_update(request, ticket):
+    """Validate + apply a properties change. Returns an error string, or None on success.
+    Enforces: closed/pending/escalate require a note; escalate also requires a person.
+    """
+    new_status = request.POST.get("status", ticket.status)
+    note = request.POST.get("transition_note", "").strip()
+
+    # T1: note required when moving INTO a note-required state
+    if new_status != ticket.status and new_status in Ticket.NOTE_REQUIRED:
+        if not note:
+            label = dict(Ticket.STATUS)[new_status]
+            return f"A note is required to move this ticket to “{label}”."
+        if new_status == "escalated" and not request.POST.get("escalate_to"):
+            return "Choose who to escalate this ticket to."
+
+    prev = {"status_val": ticket.status, "status": ticket.get_status_display(),
+            "priority": ticket.get_priority_display(),
+            "assignee": ticket.assignee_id, "group": ticket.group_id,
+            "ever_assigned": ticket.events.filter(description__startswith="assigned to").exists()}
+
+    form = TicketUpdateForm(request.POST, instance=ticket)
+    if not form.is_valid():
+        return "Please correct the highlighted fields."
+    ticket = form.save(commit=False)
+
+    entering = new_status != prev["status_val"]
+
+    # T2: SLA pause/resume around pending
+    if entering and new_status == "pending":
+        ticket.pause_sla()
+    elif entering and prev["status_val"] == "pending":
+        ticket.resume_sla()
+
+    # #15 closing: capture resolution + cascade + CSAT
+    if entering and new_status == "closed":
+        ticket.save()
+        ticket.close_with_resolution(note, cascade=bool(request.POST.get("cascade")))
+        log_event(ticket, request.user, f"closed the ticket — {note}")
+        fire_webhooks("ticket.closed", ticket)
+        from .notifications import send_csat_request
+        send_csat_request(ticket)
+    else:
+        # escalate → reassign to chosen person
+        if entering and new_status == "escalated":
+            target_id = request.POST.get("escalate_to")
+            ticket.assignee_id = target_id
+        ticket.save()
+        form.save_m2m()
+        if entering:
+            lbl = ticket.get_status_display()
+            if new_status in Ticket.NOTE_REQUIRED:
+                log_event(ticket, request.user, f"moved to {lbl} — {note}")
+            else:
+                log_event(ticket, request.user, f"changed status to {lbl}")
+            _post_comment_note(ticket, request.user, note)  # keep note in the thread
+
+    # priority / group / assignee change logging (unchanged states)
+    if ticket.get_priority_display() != prev["priority"]:
+        log_event(ticket, request.user, f"set priority to {ticket.get_priority_display()}")
+    if ticket.group_id != prev["group"]:
+        log_event(ticket, request.user,
+                  f"routed to group {ticket.group.name if ticket.group_id else 'none'}")
+    if ticket.assignee_id != prev["assignee"]:
+        who = ticket.assignee.username if ticket.assignee_id else "nobody"
+        first = "" if prev["ever_assigned"] else " (first assignee)"
+        log_event(ticket, request.user, f"assigned to {who}{first}")
+        if ticket.assignee_id:
+            from .notifications import notify_assignment
+            notify_assignment(ticket)
+    return None
+
+
+def _post_comment_note(ticket, author, note):
+    """Persist a transition note as an internal comment so it's visible in the thread."""
+    if note:
+        Comment.objects.create(ticket=ticket, author=author, body=note, internal=True)
 
 
 @login_required
@@ -448,6 +506,82 @@ def org_settings(request):
     })
 
 
+# ---- T3: groups & triggers console (admins only) ----
+
+@admin_only
+def groups(request):
+    from .forms import GroupForm
+    from .models import Group
+    form = GroupForm()
+    if request.method == "POST":
+        if "delete_group" in request.POST:
+            Group.objects.filter(pk=request.POST["delete_group"]).delete()
+            return redirect("groups")
+        form = GroupForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect("groups")
+    return render(request, "tickets/groups.html", {
+        "form": form,
+        "groups": Group.objects.prefetch_related("members").all(),
+    })
+
+
+@admin_only
+def triggers(request):
+    from .forms import TriggerForm
+    from .models import Trigger
+    form = TriggerForm()
+    if request.method == "POST":
+        if "delete_trigger" in request.POST:
+            Trigger.objects.filter(pk=request.POST["delete_trigger"]).delete()
+            return redirect("triggers")
+        form = TriggerForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect("triggers")
+    return render(request, "tickets/triggers.html", {
+        "form": form,
+        "triggers": Trigger.objects.select_related("set_group").all(),
+    })
+
+
+@admin_only
+def sla_policies(request):
+    from .forms import SLAPolicyForm
+    from .models import SLAPolicy
+    form = SLAPolicyForm()
+    if request.method == "POST":
+        if "delete_policy" in request.POST:
+            SLAPolicy.objects.filter(pk=request.POST["delete_policy"]).delete()
+            return redirect("sla_policies")
+        form = SLAPolicyForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect("sla_policies")
+    return render(request, "tickets/sla_policies.html", {
+        "form": form,
+        "policies": SLAPolicy.objects.select_related("group", "category").all(),
+    })
+
+
+@admin_only
+def canned_replies(request):
+    from .forms import CannedReplyForm
+    form = CannedReplyForm()
+    if request.method == "POST":
+        if "delete_canned" in request.POST:
+            CannedReply.objects.filter(pk=request.POST["delete_canned"]).delete()
+            return redirect("canned_replies")
+        form = CannedReplyForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect("canned_replies")
+    return render(request, "tickets/canned.html", {
+        "form": form, "replies": CannedReply.objects.all(),
+    })
+
+
 # ---- H4: bulk actions ----
 
 @login_required
@@ -489,6 +623,28 @@ def rate_ticket(request, token):
             ticket.save(update_fields=["csat_rating"])
             return render(request, "tickets/rated.html", {"ticket": ticket, "rating": rating})
     return render(request, "tickets/rate.html", {"ticket": ticket})
+
+
+# ---- U2: public status page + U3: reopen ----
+
+def ticket_status(request, token):
+    """Public per-ticket status page, keyed by the ticket's signed token."""
+    ticket = get_object_or_404(Ticket, csat_token=token)
+    if request.method == "POST" and "reopen" in request.POST:
+        if ticket.can_reopen():
+            ticket.status = "open"
+            ticket.closed_at = None
+            ticket.save(update_fields=["status", "closed_at"])
+            reason = request.POST.get("reason", "").strip()
+            log_event(ticket, None, f"reopened by requester{': ' + reason if reason else ''}")
+            if reason:
+                Comment.objects.create(ticket=ticket, author=ticket.reporter, body=reason)
+        return redirect("ticket_status", token=token)
+    # only public (non-internal) comments are visible to the customer
+    public_comments = ticket.comments.filter(internal=False).select_related("author")
+    return render(request, "tickets/status.html", {
+        "ticket": ticket, "public_comments": public_comments,
+    })
 
 
 # ---- H5: knowledge base ----

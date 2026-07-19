@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Canned replies{% endblock %}
+{% block nav_settings %}active{% endblock %}
+{% block content %}
+<div class="topbar">
+  <a class="ref-lg" href="{% url 'org_settings' %}">← Settings</a>
+  <span class="ref-lg">/ Canned replies</span>
+</div>
+<main>
+  <div class="row" style="align-items:start;">
+    <div class="card" style="flex:2 1 380px;">
+      <div class="hd">Saved replies</div>
+      <table class="queue" style="border:0; border-radius:0;">
+        <thead><tr><th>Title</th><th>Preview</th><th></th></tr></thead>
+        <tbody>
+          {% for r in replies %}
+          <tr>
+            <td class="subj">{{ r.title }}</td>
+            <td class="meta">{{ r.body|truncatewords:12 }}</td>
+            <td style="text-align:right;">
+              <form method="post" onsubmit="return confirm('Delete this reply?');">{% csrf_token %}
+                <button name="delete_canned" value="{{ r.id }}" class="linkbtn" style="color:var(--red);">Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% empty %}<tr><td colspan="3"><div class="empty">No saved replies yet.</div></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="card" style="flex:1 1 280px;">
+      <div class="hd">New reply</div>
+      <div class="bd">
+        <form method="post">
+          {% csrf_token %}
+          <div class="field"><label>Title</label>{{ form.title }}{{ form.title.errors }}</div>
+          <div class="field"><label>Body</label>{{ form.body }}{{ form.body.errors }}</div>
+          <button class="btn" type="submit" style="width:100%; justify-content:center;">Save reply</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</main>
+{% endblock %}

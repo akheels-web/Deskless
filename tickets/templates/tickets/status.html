@@ -1,0 +1,60 @@
+{% extends "portal_base.html" %}
+{% block title %}Ticket DSK-{{ ticket.pk|stringformat:"04d" }}{% endblock %}
+{% block portal %}
+<div style="max-width:640px; margin:0 auto;">
+  <p style="margin:0 0 12px;"><a href="{% url 'portal_home' %}">← Help center</a></p>
+
+  <div class="card"><div class="bd">
+    <span class="ref">DSK-{{ ticket.pk|stringformat:"04d" }}</span>
+    <h1 style="font-size:22px; font-weight:700; letter-spacing:-0.4px; margin:6px 0 10px;">{{ ticket.subject }}</h1>
+    <span class="badge s-{{ ticket.status }}">{{ ticket.get_status_display }}</span>
+    <p class="hint" style="margin:12px 0 0;">Opened {{ ticket.created_at|date:"M j, Y" }}
+      {% if ticket.status == "closed" and ticket.closed_at %} · closed {{ ticket.closed_at|date:"M j, Y" }}{% endif %}
+    </p>
+    {% if ticket.status == "closed" and ticket.resolution %}
+    <div style="margin-top:14px; padding:14px; background:var(--green-bg); border-radius:var(--radius-sm);">
+      <div class="note-tag" style="color:var(--green);">Resolution</div>
+      <div class="text" style="margin-top:4px;">{{ ticket.resolution }}</div>
+    </div>
+    {% endif %}
+  </div></div>
+
+  <!-- U3: reopen within the window -->
+  {% if ticket.can_reopen %}
+  <div class="card"><div class="bd">
+    <strong>Not resolved?</strong>
+    <p class="hint" style="margin:4px 0 12px;">You can reopen this ticket if the issue isn't fully fixed.</p>
+    <form method="post">
+      {% csrf_token %}
+      <div class="field"><textarea name="reason" rows="3" placeholder="Tell us what's still wrong (optional)"></textarea></div>
+      <button class="btn" name="reopen" value="1">Reopen ticket</button>
+    </form>
+  </div></div>
+  {% elif ticket.status == "closed" %}
+  <p class="hint" style="margin-top:14px;">This ticket is closed. To follow up, <a href="{% url 'submit_ticket' %}">submit a new request</a>.</p>
+  {% endif %}
+
+  <div class="card"><div class="hd">Updates</div><div class="bd">
+    <div class="thread">
+      <div class="msg">
+        <div class="avatar">{{ ticket.reporter.username|first|upper }}</div>
+        <div>
+          <span class="who">You</span>
+          <span class="when">· {{ ticket.created_at|date:"M j, H:i" }}</span>
+          <div class="text">{{ ticket.body|default:"(no message)" }}</div>
+        </div>
+      </div>
+      {% for c in public_comments %}
+      <div class="msg">
+        <div class="avatar">{{ c.author.username|first|upper }}</div>
+        <div>
+          <span class="who">{% if c.author == ticket.reporter %}You{% else %}Support{% endif %}</span>
+          <span class="when">· {{ c.created_at|date:"M j, H:i" }}</span>
+          <div class="text">{{ c.body }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div></div>
+</div>
+{% endblock %}

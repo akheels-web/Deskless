@@ -1,7 +1,7 @@
 from django import forms
 from django.contrib.auth import get_user_model
 
-from .models import Category, Comment, OrgSettings, Ticket
+from .models import Category, Comment, Group, OrgSettings, Ticket, Trigger
 
 User = get_user_model()
 
@@ -13,6 +13,53 @@ class CategoryForm(forms.ModelForm):
         model = Category
         fields = ["name"]
         widgets = {"name": forms.TextInput(attrs={"placeholder": "e.g. Billing"})}
+
+
+class GroupForm(forms.ModelForm):
+    """T3: create/edit a group + members, in-console."""
+
+    class Meta:
+        model = Group
+        fields = ["name", "members"]
+        widgets = {
+            "name": forms.TextInput(attrs={"placeholder": "e.g. Networking"}),
+            "members": forms.CheckboxSelectMultiple,
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["members"].queryset = User.objects.filter(is_staff=True, is_active=True)
+
+
+class TriggerForm(forms.ModelForm):
+    """T3: create/edit an auto-routing rule, in-console."""
+
+    class Meta:
+        model = Trigger
+        fields = ["name", "keyword", "set_group", "set_priority", "active"]
+        widgets = {
+            "name": forms.TextInput(attrs={"placeholder": "e.g. VPN issues"}),
+            "keyword": forms.TextInput(attrs={"placeholder": "vpn"}),
+        }
+
+
+class CannedReplyForm(forms.ModelForm):
+    """T5: manage saved replies in-console."""
+
+    class Meta:
+        from .models import CannedReply
+        model = CannedReply
+        fields = ["title", "body"]
+        widgets = {"body": forms.Textarea(attrs={"rows": 4})}
+
+
+class SLAPolicyForm(forms.ModelForm):
+    """U1: per-group/category SLA target, in-console."""
+
+    class Meta:
+        from .models import SLAPolicy
+        model = SLAPolicy
+        fields = ["group", "category", "priority", "hours"]
 
 
 class TicketUpdateForm(forms.ModelForm):
@@ -90,7 +137,7 @@ class OrgSettingsForm(forms.ModelForm):
         fields = ["name", "logo", "color", "accent",
                   "sla_urgent", "sla_high", "sla_normal", "sla_low",
                   "business_hours_enabled", "business_start", "business_end",
-                  "business_days", "holidays"]
+                  "business_days", "holidays", "reopen_days"]
         widgets = {
             "color": forms.TextInput(attrs={"type": "color"}),
             "accent": forms.TextInput(attrs={"type": "color"}),

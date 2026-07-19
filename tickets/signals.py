@@ -107,14 +107,18 @@ def on_ticket_created(sender, instance, created, **kwargs):
                 ticket=instance, actor=None, description=f"trigger '{trig.name}' applied")
             break  # ponytail: first match wins; add ordering field if priority needed
 
-    # R3/H1: SLA deadline from the (possibly triaged) priority, business-hours aware.
+    # R3/H1/U1: SLA deadline — priority + group/category policy, business-hours aware.
     org = OrgSettings.load()
-    due = org.sla_deadline(instance.created_at, instance.priority)
+    due = org.sla_deadline(instance.created_at, instance.priority,
+                           group=group_id, category=instance.category_id)
 
+    from .models import _new_token
+    token = instance.csat_token or _new_token()  # U2: public status-page key from creation
     Ticket.objects.filter(pk=instance.pk).update(
-        priority=instance.priority, due_at=due, group_id=group_id)
+        priority=instance.priority, due_at=due, group_id=group_id, csat_token=token)
     instance.due_at = due
     instance.group_id = group_id
+    instance.csat_token = token
 
     fire_webhooks("ticket.created", instance)
     from .notifications import notify_new_ticket

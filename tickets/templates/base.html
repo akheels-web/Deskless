@@ -69,6 +69,10 @@
     .who-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: #fff; display: grid; place-items: center; font-weight: 650; font-size: 13px; flex-shrink: 0; }
     .linkbtn { background: none; border: 0; padding: 0; margin: 0; font: inherit; color: #9aa5b1; cursor: pointer; text-decoration: underline; }
     .linkbtn:hover { color: #e8ecf1; }
+    .signout-btn { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px;
+      background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); color: #cdd4dc; cursor: pointer; transition: all .12s ease; }
+    .signout-btn svg { width: 17px; height: 17px; }
+    .signout-btn:hover { background: rgba(255,255,255,.14); color: #fff; }
 
     .content { padding: 0; min-width: 0; }
     .topbar {
@@ -413,13 +417,16 @@
       <div class="spacer"></div>
       <div class="who">
         <div class="who-avatar">{{ user.username|first|upper }}</div>
-        <div>
-          <strong>{{ user.username }}</strong><br>
-          <form method="post" action="{% url 'logout' %}" style="display:inline;">
-            {% csrf_token %}
-            <button type="submit" class="linkbtn">Sign out</button>
-          </form>
+        <div style="min-width:0;">
+          <strong style="display:block; overflow:hidden; text-overflow:ellipsis;">{{ user.username }}</strong>
+          <span style="font-size:11.5px;">{% if user.is_superuser %}Admin{% else %}Agent{% endif %}</span>
         </div>
+        <form method="post" action="{% url 'logout' %}" style="margin-left:auto;">
+          {% csrf_token %}
+          <button type="submit" class="signout-btn" title="Sign out" aria-label="Sign out">
+            <svg viewBox="0 0 20 20" fill="none"><path d="M8 17H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3M13 14l4-4-4-4M17 10H8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </form>
       </div>
       {% endif %}
     </aside>
