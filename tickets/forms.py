@@ -158,5 +158,20 @@ class ArticleForm(forms.ModelForm):
     class Meta:
         from .models import Article
         model = Article
-        fields = ["title", "slug", "category", "body", "published"]
+        fields = ["title", "category", "body", "published"]  # #1 slug auto-generated
         widgets = {"body": forms.Textarea(attrs={"rows": 12})}
+
+    def save(self, commit=True):
+        from django.utils.text import slugify
+        from .models import Article
+        article = super().save(commit=False)
+        if not article.slug:
+            base = slugify(article.title)[:200] or "article"
+            slug, n = base, 2
+            # ensure uniqueness without clobbering this article's own slug
+            while Article.objects.filter(slug=slug).exclude(pk=article.pk).exists():
+                slug = f"{base}-{n}"; n += 1
+            article.slug = slug
+        if commit:
+            article.save()
+        return article

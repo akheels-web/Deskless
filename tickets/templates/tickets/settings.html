@@ -3,113 +3,151 @@
 {% block nav_settings %}active{% endblock %}
 {% block content %}
 <div class="topbar"><h1>Organization settings</h1></div>
-<main style="max-width:560px;">
-  <div class="card"><div class="bd">
-    <form method="post" enctype="multipart/form-data">
-      {% csrf_token %}
-      <div class="field">
-        <label for="{{ form.name.id_for_label }}">Organization name</label>
-        {{ form.name }}
-      </div>
-      <div class="field">
-        <label for="{{ form.logo.id_for_label }}">Logo</label>
-        {% if org.logo %}<div style="margin-bottom:8px;"><img src="{{ org.logo.url }}" alt="Current logo" style="max-height:44px; background:var(--rail); padding:6px 10px; border-radius:4px;"></div>{% endif %}
-        {{ form.logo }}
-        <p class="hint" style="margin-top:6px;">Shown in the sidebar. PNG or SVG with transparent background works best.</p>
-      </div>
-      <div class="row">
+<main style="max-width:960px;">
+  <div class="settings-grid">
+
+    <!-- Branding -->
+    <div class="card"><div class="bd">
+      <strong>Branding</strong>
+      <form method="post" enctype="multipart/form-data" style="margin-top:14px;">
+        {% csrf_token %}
         <div class="field">
-          <label for="{{ form.color.id_for_label }}">Header color</label>
-          {{ form.color }}
+          <label for="{{ form.name.id_for_label }}">Organization name</label>
+          {{ form.name }}
         </div>
         <div class="field">
-          <label for="{{ form.accent.id_for_label }}">Accent color</label>
-          {{ form.accent }}
+          <label>Logo</label>
+          <div style="display:flex; align-items:center; gap:12px;">
+            <img id="logo-preview" src="{% if org.logo %}{{ org.logo.url }}{% endif %}" alt=""
+                 style="max-height:40px; max-width:120px; object-fit:contain; background:var(--rail); padding:6px 10px; border-radius:6px; {% if not org.logo %}display:none;{% endif %}">
+            <label class="btn ghost" style="cursor:pointer; margin:0;">
+              Choose logo
+              <input type="file" name="logo" accept="image/*" style="display:none;"
+                     onchange="const f=this.files[0]; if(f){const p=document.getElementById('logo-preview'); p.src=URL.createObjectURL(f); p.style.display='inline-block';}">
+            </label>
+          </div>
+          <p class="hint" style="margin-top:6px;">Shown in the sidebar, login &amp; portal. PNG/SVG with transparent background works best.</p>
         </div>
-      </div>
-      <div style="margin:22px 0 16px; padding-top:18px; border-top:1px solid var(--line);">
-        <strong>SLA resolution targets</strong>
-        <p class="hint" style="margin:4px 0 0;">Hours to resolve, by priority. Tickets past their deadline are flagged overdue and email the assignee.</p>
-      </div>
-      <div class="row">
-        <div class="field"><label for="{{ form.sla_urgent.id_for_label }}">Urgent (hrs)</label>{{ form.sla_urgent }}</div>
-        <div class="field"><label for="{{ form.sla_high.id_for_label }}">High (hrs)</label>{{ form.sla_high }}</div>
-        <div class="field"><label for="{{ form.sla_normal.id_for_label }}">Normal (hrs)</label>{{ form.sla_normal }}</div>
-        <div class="field"><label for="{{ form.sla_low.id_for_label }}">Low (hrs)</label>{{ form.sla_low }}</div>
-      </div>
-
-      <div style="margin:22px 0 16px; padding-top:18px; border-top:1px solid var(--line);">
-        <strong>Business hours</strong>
-        <p class="hint" style="margin:4px 0 0;">When enabled, the SLA clock only ticks during work hours — a ticket opened Friday evening won't breach over the weekend.</p>
-      </div>
-      <label style="display:flex; gap:8px; align-items:center; margin-bottom:14px; font-weight:500;">
-        {{ form.business_hours_enabled }} Count SLA during business hours only
-      </label>
-      <div class="row">
-        <div class="field"><label for="{{ form.business_start.id_for_label }}">Start hour (0–23)</label>{{ form.business_start }}</div>
-        <div class="field"><label for="{{ form.business_end.id_for_label }}">End hour (0–23)</label>{{ form.business_end }}</div>
-      </div>
-      <div class="field">
-        <label>Working days</label>
-        <div class="weekday-grid">
-          {% for cb in form.business_days %}
-          <label class="weekday">{{ cb.tag }} {{ cb.choice_label }}</label>
-          {% endfor %}
+        <div class="row">
+          <div class="field">
+            <label for="{{ form.color.id_for_label }}">Header color</label>
+            <div class="color-field">{{ form.color }}<span class="swatch-hex" id="hex-color"></span></div>
+          </div>
+          <div class="field">
+            <label for="{{ form.accent.id_for_label }}">Accent color</label>
+            <div class="color-field">{{ form.accent }}<span class="swatch-hex" id="hex-accent"></span></div>
+          </div>
         </div>
+
+        <div style="margin:20px 0 14px; padding-top:16px; border-top:1px solid var(--line);"><strong>SLA resolution targets</strong>
+          <p class="hint" style="margin:4px 0 0;">Hours to resolve, by priority.</p></div>
+        <div class="row">
+          <div class="field"><label>Urgent</label>{{ form.sla_urgent }}</div>
+          <div class="field"><label>High</label>{{ form.sla_high }}</div>
+          <div class="field"><label>Normal</label>{{ form.sla_normal }}</div>
+          <div class="field"><label>Low</label>{{ form.sla_low }}</div>
+        </div>
+
+        <div style="margin:20px 0 14px; padding-top:16px; border-top:1px solid var(--line);"><strong>Business hours</strong>
+          <p class="hint" style="margin:4px 0 0;">SLA clock only ticks during work hours.</p></div>
+        <label style="display:flex; gap:8px; align-items:center; margin-bottom:14px; font-weight:500;">
+          {{ form.business_hours_enabled }} Count SLA during business hours only
+        </label>
+        <div class="row">
+          <div class="field"><label>Start hour (0–23)</label>{{ form.business_start }}</div>
+          <div class="field"><label>End hour (0–23)</label>{{ form.business_end }}</div>
+        </div>
+        <div class="field">
+          <label>Working days</label>
+          <div class="weekday-grid">
+            {% for cb in form.business_days %}<label class="weekday">{{ cb.tag }} {{ cb.choice_label }}</label>{% endfor %}
+          </div>
+        </div>
+        <div class="field">
+          <label>Holidays</label>
+          <div class="date-chips" id="holiday-chips"></div>
+          <div style="display:flex; gap:6px;">
+            <input type="date" id="holiday-input" style="flex:1;">
+            <button type="button" class="btn ghost" id="holiday-add">Add date</button>
+          </div>
+          <p class="hint" style="margin-top:6px;">Picked days never count toward SLA.</p>
+          <textarea name="holidays" id="holiday-store" style="display:none;">{{ form.holidays.value|default:'' }}</textarea>
+        </div>
+
+        {{ form.errors }}
+        <button class="btn" type="submit" style="margin-top:16px;">Save settings</button>
+      </form>
+    </div></div>
+
+    <!-- Categories -->
+    <div class="card"><div class="bd">
+      <strong>Categories</strong>
+      <p class="hint" style="margin:4px 0 14px;">Buckets for routing tickets.</p>
+      <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;">
+        {% for c in categories %}
+        <span class="date-chip">{{ c.name }}
+          <form method="post" style="display:inline;">{% csrf_token %}
+            <button name="delete_category" value="{{ c.id }}" title="Delete">×</button>
+          </form>
+        </span>
+        {% empty %}<span class="hint">No categories yet.</span>{% endfor %}
       </div>
-      <div class="field">
-        <label for="{{ form.holidays.id_for_label }}">Holidays</label>
-        {{ form.holidays }}
-        <p class="hint" style="margin-top:6px;">One date per line (YYYY-MM-DD). These days never count toward SLA.</p>
+      <form method="post" style="display:flex; gap:8px;">
+        {% csrf_token %}{{ cat_form.name }}
+        <button class="btn" name="add_category" value="1">Add</button>
+      </form>
+      {{ cat_form.name.errors }}
+    </div></div>
+
+    <!-- Groups & triggers -->
+    <div class="card"><div class="bd">
+      <strong>Groups &amp; triggers</strong>
+      <p class="hint" style="margin:4px 0 12px;">Teams and auto-routing rules (e.g. “VPN” → Networking).</p>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <a class="btn ghost" href="/admin/tickets/group/">Manage groups</a>
+        <a class="btn ghost" href="/admin/tickets/trigger/">Manage triggers</a>
       </div>
+    </div></div>
 
-      {{ form.errors }}
-      <button class="btn" type="submit" style="margin-top:16px;">Save settings</button>
-    </form>
-  </div></div>
-  <p class="hint" style="margin-top:12px;">Changes apply across the whole workspace immediately.</p>
+    <!-- SSO -->
+    <div class="card"><div class="bd">
+      <strong>Single sign-on (SSO)</strong>
+      <p class="hint" style="margin:4px 0 12px;">Google, Microsoft, or Zoho. Add credentials as a Social Application; buttons then appear on login.</p>
+      <a class="btn ghost" href="/admin/socialaccount/socialapp/add/">Configure SSO provider</a>
+    </div></div>
 
-  <div class="card" style="margin-top:16px;"><div class="bd">
-    <strong>Categories</strong>
-    <p class="hint" style="margin:4px 0 14px;">Buckets for routing tickets (Billing, IT, Sales…).</p>
-    <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;">
-      {% for c in categories %}
-      <span class="tag" style="display:inline-flex; align-items:center; gap:6px; padding:5px 10px;">
-        {{ c.name }}
-        <form method="post" style="display:inline;">{% csrf_token %}
-          <button name="delete_category" value="{{ c.id }}" class="linkbtn" style="color:var(--faint);text-decoration:none;" title="Delete">×</button>
-        </form>
-      </span>
-      {% empty %}<span class="hint">No categories yet.</span>{% endfor %}
-    </div>
-    <form method="post" style="display:flex; gap:8px;">
-      {% csrf_token %}
-      {{ cat_form.name }}
-      <button class="btn" name="add_category" value="1">Add category</button>
-    </form>
-    {{ cat_form.name.errors }}
-  </div></div>
-
-  <div class="card" style="margin-top:16px;"><div class="bd">
-    <strong>Groups &amp; triggers</strong>
-    <p class="hint" style="margin:4px 0 12px;">
-      Teams (Networking, Support…) and auto-routing rules — e.g. tickets mentioning “VPN”
-      auto-assign to a group. Managed in the admin.
-    </p>
-    <div style="display:flex; gap:8px; flex-wrap:wrap;">
-      <a class="btn ghost" href="/admin/tickets/group/">Manage groups</a>
-      <a class="btn ghost" href="/admin/tickets/trigger/">Manage triggers</a>
-    </div>
-  </div></div>
-
-  <div class="card" style="margin-top:16px;"><div class="bd">
-    <strong>Single sign-on (SSO)</strong>
-    <p class="hint" style="margin:4px 0 12px;">
-      Let agents sign in with Google, Microsoft, or Zoho. Add your provider's
-      Client ID &amp; Secret as a <em>Social Application</em>, and buttons appear on the login page.
-      SSO users become agents automatically.
-    </p>
-    <a class="btn ghost" href="/admin/socialaccount/socialapp/add/">Configure SSO provider</a>
-  </div></div>
+  </div>
 </main>
+<script>
+  // #4 live hex label next to each color swatch
+  function bindHex(inputName, labelId) {
+    var i = document.querySelector('[name="'+inputName+'"]'), l = document.getElementById(labelId);
+    if (!i || !l) return;
+    var sync = function () { l.textContent = i.value; }; sync();
+    i.addEventListener('input', sync);
+  }
+  bindHex('color', 'hex-color'); bindHex('accent', 'hex-accent');
+
+  // #6 holiday chips ↔ hidden textarea
+  (function () {
+    var store = document.getElementById('holiday-store');
+    var chips = document.getElementById('holiday-chips');
+    var input = document.getElementById('holiday-input');
+    function dates() { return store.value.split('\n').map(function(s){return s.trim();}).filter(Boolean); }
+    function save(list) { store.value = list.join('\n'); render(); }
+    function render() {
+      chips.innerHTML = '';
+      dates().forEach(function (d) {
+        var el = document.createElement('span'); el.className = 'date-chip';
+        el.innerHTML = d + ' <button type="button" aria-label="Remove">×</button>';
+        el.querySelector('button').onclick = function () { save(dates().filter(function(x){return x!==d;})); };
+        chips.appendChild(el);
+      });
+    }
+    document.getElementById('holiday-add').onclick = function () {
+      if (input.value && dates().indexOf(input.value) === -1) { save(dates().concat(input.value).sort()); input.value=''; }
+    };
+    render();
+  })();
+</script>
 {% endblock %}

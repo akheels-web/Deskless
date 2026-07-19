@@ -10,10 +10,16 @@
     <!-- left: subject + conversation -->
     <div>
       <h1 style="font-size:22px; font-weight:680; letter-spacing:-0.4px; margin:0 0 6px;">{{ ticket.subject }}</h1>
-      <p class="hint" style="margin:0 0 22px;">
+      <p class="hint" style="margin:0 0 18px;">
         Opened by <strong>{{ ticket.reporter.get_full_name|default:ticket.reporter.username }}</strong>
         on {{ ticket.created_at|date:"M j, Y · H:i" }}
       </p>
+
+      <!-- #14 the requester's original description, clearly labeled -->
+      <div class="card" style="margin-bottom:16px;"><div class="bd">
+        <div class="note-tag" style="color:var(--muted);">Summary</div>
+        <div class="text" style="margin-top:6px;">{{ ticket.body|default:"(no description provided)" }}</div>
+      </div></div>
 
       {% if ticket.status == "closed" and ticket.resolution %}
       <div class="card" style="border-color:var(--green); background:var(--green-bg); margin-bottom:16px;">
@@ -24,16 +30,8 @@
       </div>
       {% endif %}
 
-      <div class="card"><div class="bd">
+      <div class="card"><div class="hd">Conversation</div><div class="bd">
         <div class="thread">
-          <div class="msg">
-            <div class="avatar">{{ ticket.reporter.username|first|upper }}</div>
-            <div>
-              <span class="who">{{ ticket.reporter.get_full_name|default:ticket.reporter.username }}</span>
-              <span class="when">· {{ ticket.created_at|date:"M j, H:i" }}</span>
-              <div class="text">{{ ticket.body|default:"(no message)" }}</div>
-            </div>
-          </div>
           {% for c in comments %}
           <div class="msg {% if c.internal %}note{% endif %}">
             <div class="avatar">{{ c.author.username|first|upper }}</div>
@@ -44,6 +42,8 @@
               <div class="text">{{ c.body }}</div>
             </div>
           </div>
+          {% empty %}
+          <p class="hint" style="margin:0;">No replies yet. Be the first to respond.</p>
           {% endfor %}
         </div>
       </div></div>
@@ -110,13 +110,32 @@
           <form method="post">
             {% csrf_token %}
             <div class="field"><label>Status</label>{{ uform.status }}</div>
+            <!-- #15 resolution note appears inline when Closed is chosen -->
+            <div class="field" id="resolution-field" style="display:none;">
+              <label for="id_resolution_note">Resolution note</label>
+              <textarea name="resolution_note" id="id_resolution_note" rows="3" placeholder="How was this resolved? Shared with the requester."></textarea>
+              {% if related %}
+              <label style="display:flex; gap:7px; align-items:center; margin-top:8px; font-weight:500; color:var(--muted);">
+                <input type="checkbox" name="cascade" checked style="width:auto;"> Also close {{ related|length }} linked ticket{{ related|length|pluralize }}
+              </label>
+              {% endif %}
+            </div>
             <div class="field"><label>Priority</label>{{ uform.priority }}</div>
             <div class="field"><label>Group</label>{{ uform.group }}</div>
             <div class="field"><label>Assignee</label>{{ uform.assignee }}</div>
             <div class="field"><label>Category</label>{{ uform.category }}</div>
             <div class="field"><label>Tags</label>{{ uform.tags }}</div>
-            <button class="btn ghost" name="update" value="1" style="width:100%; justify-content:center;">Save changes</button>
+            <button class="btn" name="update" value="1" style="width:100%; justify-content:center;">Save changes</button>
           </form>
+          <script>
+            (function () {
+              var sel = document.getElementById('id_status');
+              var rf = document.getElementById('resolution-field');
+              if (!sel || !rf) return;
+              function sync() { rf.style.display = (sel.value === 'closed') ? 'block' : 'none'; }
+              sel.addEventListener('change', sync); sync();
+            })();
+          </script>
           <div style="margin-top:18px; padding-top:16px; border-top:1px solid var(--line);">
             <p class="hint" style="margin:0 0 4px;">Requester</p>
             <p style="margin:0 0 12px;">{{ ticket.reporter.email|default:ticket.reporter.username }}</p>
@@ -155,30 +174,6 @@
           </form>
         </div>
       </aside>
-
-      <!-- F2: close with resolution -->
-      {% if ticket.is_open %}
-      <aside class="card" style="border-color:var(--line-strong);">
-        <div class="hd">Close ticket</div>
-        <div class="bd">
-          <form method="post">
-            {% csrf_token %}
-            <div class="field">
-              <label for="id_resolution">Resolution</label>
-              {{ close_form.resolution }}
-            </div>
-            {% if related %}
-            <label style="display:flex; gap:7px; align-items:center; margin-bottom:12px; font-weight:500; color:var(--muted);">
-              {{ close_form.cascade }} Also close {{ related|length }} linked ticket{{ related|length|pluralize }}
-            </label>
-            {% endif %}
-            <button class="btn" name="close" value="1" style="width:100%; justify-content:center; background:var(--green); border-color:var(--green);">
-              Resolve &amp; close
-            </button>
-          </form>
-        </div>
-      </aside>
-      {% endif %}
 
       {% if ticket.csat_rating %}
       <aside class="card">

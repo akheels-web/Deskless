@@ -72,10 +72,12 @@
           <td class="spine"><span></span></td>
           <td><input type="checkbox" class="row-check" name="ids" value="{{ t.pk }}" form="bulk-form"></td>
           <td><span class="ref">DSK-{{ t.pk|stringformat:"04d" }}</span></td>
-          <td><a class="subj" href="{% url 'ticket_detail' t.pk %}">{{ t.subject }}</a></td>
+          <td class="subj-cell"><a class="subj" href="{% url 'ticket_detail' t.pk %}">{{ t.subject }}</a></td>
           <td>
-            <span class="badge s-{{ t.status }}">{{ t.get_status_display }}</span>
-            {% if t.is_overdue %}<span class="badge overdue" title="Past SLA deadline">Overdue</span>{% endif %}
+            <span class="status-cell">
+              <span class="badge s-{{ t.status }}">{{ t.get_status_display }}</span>
+              {% if t.is_overdue %}<span class="badge overdue" title="Past SLA deadline">Overdue</span>{% endif %}
+            </span>
           </td>
           <td><span class="prio p-{{ t.priority }}">{{ t.get_priority_display }}</span></td>
           <td class="meta">{% if t.category %}<span class="tag">{{ t.category.name }}</span>{% else %}—{% endif %}</td>

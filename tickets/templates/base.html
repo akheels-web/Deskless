@@ -109,7 +109,9 @@
 
     /* ---- cards / panels ---- */
     .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-sm); }
+    /* stacked cards get spacing, but NOT when they sit side-by-side in a flex row */
     .card + .card { margin-top: 16px; }
+    .row > .card + .card, .row .card { margin-top: 0; }
     .card .hd { padding: 15px 20px; border-bottom: 1px solid var(--line); font-weight: 650; letter-spacing: -0.2px; }
     .card .bd { padding: 20px; }
 
@@ -147,7 +149,12 @@
     tr.pr-urgent td.spine > span { background: var(--red); }
     .subj { font-weight: 550; color: var(--ink); }
     .subj:hover { color: var(--accent); }
-    .meta { color: var(--muted); font-size: 13px; }
+    .meta { color: var(--muted); font-size: 13px; white-space: nowrap; }
+    /* #3 queue breathing room: subject gets the space, other cols stay tight */
+    .queue td, .queue th { white-space: nowrap; }
+    .queue td.subj-cell { white-space: normal; min-width: 220px; }
+    .queue td.subj-cell .subj { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .queue .status-cell { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
 
     /* ---- queue left-panel layout ---- */
     .queue-layout { display: grid; grid-template-columns: 200px 1fr; gap: 22px; align-items: start; max-width: 1120px; }
@@ -241,6 +248,19 @@
     .link-form { display: flex; gap: 6px; }
     .link-form input { flex: 1; min-width: 0; }
     .link-form .btn { flex-shrink: 0; }
+    /* #4 color picker as a swatch, not a full-width bar */
+    input[type="color"] { width: 48px; height: 36px; padding: 3px; cursor: pointer; }
+    .color-field { display: flex; align-items: center; gap: 10px; }
+    .color-field .swatch-hex { font-family: var(--mono); font-size: 13px; color: var(--muted); }
+    /* #5 settings two-column masonry */
+    .settings-grid { column-count: 2; column-gap: 16px; }
+    .settings-grid > .card { break-inside: avoid; margin-bottom: 16px; display: inline-block; width: 100%; }
+    @media (max-width: 860px) { .settings-grid { column-count: 1; } }
+    /* #6 holiday chips */
+    .date-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+    .date-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 100px;
+      background: var(--grey-bg); font-size: 13px; }
+    .date-chip button { background: none; border: 0; color: var(--faint); cursor: pointer; font-size: 15px; line-height: 1; padding: 0; }
     .detail-grid { display: grid; grid-template-columns: 1fr 280px; gap: 22px; align-items: start; }
     @media (max-width: 900px) { .detail-grid { grid-template-columns: 1fr; } }
     .empty { text-align: center; color: var(--faint); padding: 56px 20px; }

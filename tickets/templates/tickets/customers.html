@@ -9,16 +9,26 @@
     <div class="card" style="flex:2 1 340px;">
       <div class="hd">People</div>
       <table class="queue" style="border:0; border-radius:0;">
-        <thead><tr><th>Name</th><th>Email</th><th>Joined</th></tr></thead>
+        <thead><tr><th>Name</th><th>Email</th><th>Joined</th><th></th></tr></thead>
         <tbody>
           {% for u in customers %}
-          <tr><td class="subj">{{ u.get_full_name|default:"—" }}</td><td class="meta">{{ u.email|default:u.username }}</td><td class="meta">{{ u.date_joined|date:"M j, Y" }}</td></tr>
-          {% empty %}<tr><td colspan="3"><div class="empty">No customers yet.</div></td></tr>
+          <tr>
+            <td class="subj">{{ u.get_full_name|default:"—" }}</td>
+            <td class="meta">{{ u.email|default:u.username }}</td>
+            <td class="meta">{{ u.date_joined|date:"M j, Y" }}</td>
+            <td style="text-align:right;">
+              <form method="post" onsubmit="return confirm('Remove this customer?');">
+                {% csrf_token %}
+                <button name="remove_user" value="{{ u.id }}" class="linkbtn" style="color:var(--red);">Remove</button>
+              </form>
+            </td>
+          </tr>
+          {% empty %}<tr><td colspan="4"><div class="empty">No customers yet.</div></td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
-    <div style="flex:1 1 260px;">
+    <div style="flex:1 1 260px; display:flex; flex-direction:column; gap:16px;">
       <div class="card"><div class="bd">
         <strong>Add a customer</strong>
         <form method="post" style="margin-top:12px;">
@@ -29,11 +39,17 @@
         </form>
       </div></div>
       <div class="card"><div class="bd">
-        <strong>Bulk add (CSV)</strong>
+        <strong>Bulk import</strong>
         <form method="post" style="margin-top:12px;">
           {% csrf_token %}
-          <div class="field">{{ bulk_form.csv }}<p class="hint" style="margin-top:5px;">One per line: <code>email,name</code></p></div>
-          <button class="btn ghost" name="add_bulk" value="1" style="width:100%; justify-content:center;">Import</button>
+          <div class="field">{{ bulk_form.csv }}<p class="hint" style="margin-top:5px;">Paste CSV — one per line: <code>email,name</code></p></div>
+          <button class="btn ghost" name="add_bulk" value="1" style="width:100%; justify-content:center;">Import from text</button>
+        </form>
+        <form method="post" enctype="multipart/form-data" style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">
+          {% csrf_token %}
+          <div class="field"><label>Excel file (.xlsx)</label><input type="file" name="xlsx" accept=".xlsx"></div>
+          <p class="hint" style="margin:-8px 0 10px;">Column A = email, column B = name.</p>
+          <button class="btn ghost" name="add_excel" value="1" style="width:100%; justify-content:center;">Import Excel</button>
         </form>
       </div></div>
     </div>

@@ -11,10 +11,8 @@
     <form method="post">
       {% csrf_token %}
       <div class="field"><label for="{{ form.title.id_for_label }}">Title</label>{{ form.title }}{{ form.title.errors }}</div>
-      <div class="row">
-        <div class="field"><label for="{{ form.slug.id_for_label }}">Slug (URL)</label>{{ form.slug }}{{ form.slug.errors }}</div>
-        <div class="field"><label for="{{ form.category.id_for_label }}">Category</label>{{ form.category }}</div>
-      </div>
+      <div class="field"><label for="{{ form.category.id_for_label }}">Category</label>{{ form.category }}</div>
+      {% if article %}<p class="hint" style="margin:-8px 0 16px;">URL: /kb/{{ article.slug }}/</p>{% endif %}
       <div class="field"><label for="{{ form.body.id_for_label }}">Body</label>{{ form.body }}{{ form.body.errors }}</div>
       <label style="display:flex; gap:8px; align-items:center; margin-bottom:16px; font-weight:500;">
         {{ form.published }} Published (visible in the customer portal)

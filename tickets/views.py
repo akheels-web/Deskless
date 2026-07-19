@@ -182,15 +182,25 @@ def ticket_detail(request, pk):
                 send_csat_request(ticket)  # H3: ask the requester to rate
             return redirect("ticket_detail", pk=pk)
         else:  # properties update
-            prev = {"status": ticket.get_status_display(),
+            prev = {"status_val": ticket.status,
+                    "status": ticket.get_status_display(),
                     "priority": ticket.get_priority_display(),
                     "assignee": ticket.assignee_id, "group": ticket.group_id,
                     "ever_assigned": ticket.events.filter(description__startswith="assigned to").exists()}
             uform = TicketUpdateForm(request.POST, instance=ticket)
             if uform.is_valid():
                 ticket = uform.save()
-                # H2/C5: record what actually changed
-                if ticket.get_status_display() != prev["status"]:
+                # #15: transitioning INTO closed → capture resolution + cascade + CSAT
+                if ticket.status == "closed" and prev["status_val"] != "closed":
+                    note = request.POST.get("resolution_note", "").strip() or "Closed by an agent."
+                    cascade = bool(request.POST.get("cascade"))
+                    ticket.close_with_resolution(note, cascade=cascade)
+                    log_event(ticket, request.user, "closed the ticket")
+                    fire_webhooks("ticket.closed", ticket)
+                    from .notifications import send_csat_request
+                    send_csat_request(ticket)
+                # H2/C5: record other status changes
+                elif ticket.get_status_display() != prev["status"]:
                     log_event(ticket, request.user, f"changed status to {ticket.get_status_display()}")
                 if ticket.get_priority_display() != prev["priority"]:
                     log_event(ticket, request.user, f"set priority to {ticket.get_priority_display()}")
@@ -300,17 +310,31 @@ def notify_reporter(ticket, comment):
 
 @admin_only
 def team(request):
+    form = NewUserForm()
     if request.method == "POST":
+        if "remove_user" in request.POST:  # #9 removal
+            _remove_user(request, request.POST["remove_user"])
+            return redirect("team")
         form = NewUserForm(request.POST)
         if form.is_valid():
             form.save()
             return redirect("team")
-    else:
-        form = NewUserForm()
     return render(request, "tickets/team.html", {
         "form": form,
-        "users": User.objects.order_by("-is_superuser", "-is_staff", "username"),
+        # #10 Team = active staff only (customers have their own tab)
+        "users": User.objects.filter(is_staff=True, is_active=True).order_by("-is_superuser", "username"),
     })
+
+
+def _remove_user(request, user_id):
+    """Deactivate a user (soft delete — keeps their ticket history intact).
+    ponytail: deactivate not delete, because reporter/author are PROTECT FKs —
+    a hard delete would fail or orphan tickets. Reactivate in Django admin.
+    """
+    u = User.objects.filter(pk=user_id).first()
+    if u and u != request.user:  # can't remove yourself
+        u.is_active = False
+        u.save(update_fields=["is_active"])
 
 
 # ---- C3: customer management (admins only) ----
@@ -322,6 +346,9 @@ def customers(request):
     bulk_form = BulkCustomerForm()
     added = None
     if request.method == "POST":
+        if "remove_user" in request.POST:  # #11 removal
+            _remove_user(request, request.POST["remove_user"])
+            return redirect("customers")
         if "add_one" in request.POST:
             form = NewCustomerForm(request.POST)
             if form.is_valid():
@@ -330,26 +357,42 @@ def customers(request):
         elif "add_bulk" in request.POST:
             bulk_form = BulkCustomerForm(request.POST)
             if bulk_form.is_valid():
-                added = _bulk_create_customers(bulk_form.cleaned_data["csv"])
-    # non-staff users are customers
-    people = User.objects.filter(is_staff=False).order_by("-date_joined")[:100]
+                added = _bulk_add(_rows_from_text(bulk_form.cleaned_data["csv"]))
+        elif "add_excel" in request.POST and request.FILES.get("xlsx"):  # #11 Excel
+            added = _bulk_add(_rows_from_excel(request.FILES["xlsx"]))
+    people = User.objects.filter(is_staff=False, is_active=True).order_by("-date_joined")[:100]
     return render(request, "tickets/customers.html", {
         "form": form, "bulk_form": bulk_form, "customers": people, "added": added,
     })
 
 
-def _bulk_create_customers(text):
-    """Create customers from 'email,name' lines. Returns count created."""
+def _rows_from_text(text):
     import csv as csvmod
     import io
+    return list(csvmod.reader(io.StringIO(text)))
+
+
+def _rows_from_excel(f):
+    """First col = email, second col = name. Skips a header row if present."""
+    import openpyxl
+    wb = openpyxl.load_workbook(f, read_only=True)
+    rows = []
+    for r in wb.active.iter_rows(values_only=True):
+        if r and r[0]:
+            rows.append([str(r[0]), str(r[1]) if len(r) > 1 and r[1] else ""])
+    return rows
+
+
+def _bulk_add(rows):
+    """Create customers from [email, name] rows. Returns count created."""
     created = 0
-    for row in csvmod.reader(io.StringIO(text)):
+    for row in rows:
         if not row:
             continue
-        email = row[0].strip().lower()
-        name = row[1].strip() if len(row) > 1 else ""
+        email = str(row[0]).strip().lower()
+        name = str(row[1]).strip() if len(row) > 1 else ""
         if "@" not in email or User.objects.filter(username=email).exists():
-            continue  # skip invalid/dupes silently — report count only
+            continue  # skip invalid/dupes/header silently — report count only
         User.objects.create_user(username=email, email=email, first_name=name)
         created += 1
     return created
