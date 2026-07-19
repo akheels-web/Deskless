@@ -247,6 +247,16 @@ class OrgSettings(models.Model):
     reopen_days = models.PositiveIntegerField(
         default=3, help_text="Days a customer can reopen a closed ticket (0 disables)")
 
+    # Email: outbound SMTP (DB overrides env). Blank host → env/console fallback.
+    site_url = models.URLField(
+        blank=True, help_text="Public base URL, e.g. https://deskless.example.com — used in email links")
+    email_host = models.CharField(max_length=200, blank=True, help_text="SMTP server")
+    email_port = models.PositiveIntegerField(default=587)
+    email_user = models.CharField(max_length=200, blank=True)
+    email_password = models.CharField(max_length=200, blank=True)
+    email_use_tls = models.BooleanField(default=True)
+    email_from = models.EmailField(blank=True, help_text="From address (defaults to SMTP user)")
+
     class Meta:
         verbose_name = "Organization settings"
         verbose_name_plural = "Organization settings"

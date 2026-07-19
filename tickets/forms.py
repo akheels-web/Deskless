@@ -137,11 +137,16 @@ class OrgSettingsForm(forms.ModelForm):
         fields = ["name", "logo", "color", "accent",
                   "sla_urgent", "sla_high", "sla_normal", "sla_low",
                   "business_hours_enabled", "business_start", "business_end",
-                  "business_days", "holidays", "reopen_days"]
+                  "business_days", "holidays", "reopen_days",
+                  "site_url", "email_host", "email_port", "email_user",
+                  "email_password", "email_use_tls", "email_from"]
         widgets = {
             "color": forms.TextInput(attrs={"type": "color"}),
             "accent": forms.TextInput(attrs={"type": "color"}),
             "holidays": forms.Textarea(attrs={"rows": 4, "placeholder": "2026-12-25\n2026-01-01"}),
+            "email_password": forms.PasswordInput(render_value=True),
+            "site_url": forms.TextInput(attrs={"placeholder": "https://deskless.example.com"}),
+            "email_host": forms.TextInput(attrs={"placeholder": "smtp.gmail.com"}),
         }
 
     def __init__(self, *args, **kwargs):

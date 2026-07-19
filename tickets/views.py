@@ -355,13 +355,11 @@ def notify_reporter(ticket, comment):
         return
     if comment.author_id == ticket.reporter_id:
         return  # don't notify the reporter about their own message
-    send_mail(
-        subject=f"[Ticket #{ticket.pk}] {ticket.subject}",
-        message=comment.body,
-        from_email=None,  # uses DEFAULT_FROM_EMAIL
-        recipient_list=[ticket.reporter.email],
-        fail_silently=True,  # ponytail: don't 500 the agent if SMTP is down
-    )
+    from .notifications import _send, _absolute
+    from django.urls import reverse
+    link = _absolute(reverse("ticket_status", args=[ticket.csat_token])) if ticket.csat_token else ""
+    body = comment.body + (f"\n\nView your ticket: {link}" if link else "")
+    _send(f"[DSK-{ticket.pk:04d}] {ticket.subject}", body, [ticket.reporter.email])
 
 
 # ---- F4: team / role management (admins only) ----

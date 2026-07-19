@@ -81,6 +81,23 @@
           <p class="hint" style="margin-top:6px;">0 disables reopening. A reopen button shows on the customer status page within this window.</p>
         </div>
 
+        <div style="margin:20px 0 14px; padding-top:16px; border-top:1px solid var(--line);"><strong>Email &amp; links</strong>
+          <p class="hint" style="margin:4px 0 0;">Outbound email for notifications &amp; CSAT. Leave SMTP blank to fall back to server config.</p></div>
+        <div class="field">
+          <label>Public site URL</label>{{ form.site_url }}
+          <p class="hint" style="margin-top:6px;">Used to build links in emails (status page, rating). e.g. https://deskless.example.com</p>
+        </div>
+        <div class="field"><label>SMTP host</label>{{ form.email_host }}</div>
+        <div class="row">
+          <div class="field"><label>Port</label>{{ form.email_port }}</div>
+          <div class="field" style="flex:2;"><label>From address</label>{{ form.email_from }}</div>
+        </div>
+        <div class="row">
+          <div class="field"><label>SMTP username</label>{{ form.email_user }}</div>
+          <div class="field"><label>SMTP password</label>{{ form.email_password }}</div>
+        </div>
+        <label style="display:flex; gap:8px; align-items:center; margin-bottom:8px; font-weight:500;">{{ form.email_use_tls }} Use TLS</label>
+
         {{ form.errors }}
         <button class="btn" type="submit" style="margin-top:16px;">Save settings</button>
       </form>
