@@ -1,266 +1,153 @@
 # Deskless
 
-A lightweight, self-hostable ticketing system. **Django + DRF. MIT licensed** — you own it, customize it, and keep client work private.
+A modern, self-hostable helpdesk & ticketing system. **Django + DRF, MIT licensed** — own it, brand it, extend it, and keep customer data on your own infrastructure.
+
+Two experiences from one deploy: a **customer portal** (help center, submit & track requests) and an **agent console** (queue, SLAs, reporting, admin).
+
+---
 
 ## Features
 
-- **Ticket workflow** — Open → In Progress → Pending → Escalated → Closed, with per-priority SLA deadlines
-- **Conversations** — threaded public replies + internal notes
-- **Linked tickets** — link related issues; closing one can cascade-close the rest with a shared resolution
-- **Queue** — left-panel views (Open / My tickets / Unassigned / Closed / All) with live counts, search, pagination
-- **Dashboard** — landing widgets: open, escalated, assigned-to-me, unassigned, closed
-- **SLA engine** — resolution targets per priority, overdue flagging, breach emails
-- **Email** — public intake form, email-to-ticket (IMAP), notifications (SMTP): new/assigned/reply/breach
-- **AI triage** — auto-sets priority on new tickets (keywords, or an LLM if `OPENAI_API_KEY` is set)
-- **Roles & team** — customer / agent / admin, managed in-app
-- **Branding** — org name, logo upload, and theme colors, editable in Settings (no redeploy)
-- **SSO** — Google, Microsoft, Zoho via OAuth; SSO users auto-provision as agents
-- **Integrations** — REST API (token auth) + outbound webhooks on ticket events
-- **Reports** — counts by status/priority/agent, average time to resolve
+**Ticketing**
+- Workflow: Open → In Progress → Pending → Escalate → Closed, with mandatory notes on key transitions
+- Threaded conversations with public replies and internal notes
+- Linked tickets with cascade-close and shared resolution
+- Categories, tags, groups (teams), and file attachments
+- `@mention` teammates in internal notes
+- Full audit history per ticket (creation, assignment, status changes, reopen)
 
-## Architecture
+**SLA & automation**
+- Resolution targets per priority, plus per-group / per-category SLA policies
+- Business-hours-aware clock with configurable working days and holidays
+- SLA pauses automatically while a ticket is Pending
+- Overdue flagging and one-time breach emails
+- Triggers: keyword rules that auto-route to a group and set priority
+- AI triage: auto-prioritizes new tickets by keywords (or an LLM if configured)
 
-```mermaid
-graph TD
-    subgraph Intake["Ticket intake — every route creates a Ticket"]
-        WEB[Public form<br/>/submit/]
-        MAIL[Inbound email<br/>manage.py fetch_email]
-        API_IN[REST API<br/>POST /api/tickets/]
-        AGENTNEW[Agent<br/>New ticket]
-    end
+**Customer portal**
+- Help-center home with knowledge-base search
+- Submit a request (with attachments) — no login required
+- Track tickets via a passwordless magic link
+- Per-ticket status page; reopen a closed ticket within a configurable window
+- CSAT rating on resolution
 
-    subgraph App["Django app (helpdesk)"]
-        VIEWS[Views + Agent UI]
-        DRF[DRF ViewSets + Token auth]
-        SIGNAL[post_save signal<br/>AI triage · set SLA due_at]
-        MODELS[(Ticket · Comment · OrgSettings<br/>Webhook · SocialApp)]
-        NOTIFY[Notifications<br/>SMTP + webhooks]
-    end
+**Agent console**
+- Queue with left-panel views (Open / Mine / Unassigned / Closed / All), search, pagination, bulk actions
+- Dashboard widgets: open, overdue, assigned-to-me, unassigned, closed
+- Reports: volume by status / priority / agent, average time to resolve, CSAT
+- In-console knowledge-base authoring and canned replies
 
-    DB[(Postgres / SQLite)]
-    AGENT[Agent browser]
-    CUST[Customer email]
-    EXT[External services]
+**Administration**
+- Roles: customer / agent / admin, managed in-app; add & remove users
+- Customer management with CSV and Excel bulk import
+- In-app branding: name, logo, theme colors (no redeploy)
+- Configurable email (SMTP), SLA, business hours, groups, triggers — all from Settings
 
-    WEB --> VIEWS
-    AGENTNEW --> VIEWS
-    MAIL --> MODELS
-    API_IN --> DRF
-    VIEWS --> MODELS
-    DRF --> MODELS
-    MODELS -->|on create| SIGNAL
-    SIGNAL --> DB
-    SIGNAL --> NOTIFY
-    MODELS --> DB
-    AGENT --> VIEWS
-    AGENT -->|SSO / password| VIEWS
-    AGENT --> DRF
-    VIEWS --> NOTIFY
-    NOTIFY --> CUST
-    NOTIFY -->|webhook POST| EXT
-```
+**Security & integrations**
+- SSO via Google, Microsoft, and Zoho (OAuth)
+- Login rate-limiting (django-axes), HTTPS hardening, secure cookies, HSTS
+- REST API (token auth) + outbound webhooks on ticket events
 
-## Ticket lifecycle
+---
 
-```mermaid
-stateDiagram-v2
-    [*] --> open: created (form / email / API / agent)
-    open --> in_progress: agent starts work
-    in_progress --> pending: awaiting customer
-    pending --> in_progress: customer replies
-    in_progress --> escalated: needs escalation
-    escalated --> in_progress: taken back up
-    open --> escalated: escalate directly
-    in_progress --> closed: resolve & close
-    escalated --> closed: resolve & close
-    pending --> closed: resolve & close
-    open --> closed: resolve & close
-    closed --> [*]
+## Tech stack
 
-    note right of closed
-        Closing with a resolution can
-        cascade-close linked tickets.
-    end note
-```
+Django 6 · Django REST Framework · PostgreSQL (SQLite for dev) · django-allauth · django-axes · gunicorn + WhiteNoise · Docker.
 
-## SLA + breach flow
+---
 
-```mermaid
-sequenceDiagram
-    participant T as Ticket (on create)
-    participant S as Signal
-    participant DB as Database
-    participant CRON as manage.py check_sla
-    participant A as Agent / staff
+## Quick start (local)
 
-    T->>S: post_save (created)
-    S->>DB: due_at = now + SLA hours(priority)
-    Note over CRON: runs on a schedule (cron)
-    CRON->>DB: find open tickets past due_at, not yet notified
-    CRON->>A: email "SLA BREACH" (once)
-    CRON->>DB: mark sla_breached + breach_notified
-```
-
-## Reply + notification flow
-
-```mermaid
-sequenceDiagram
-    participant A as Agent
-    participant V as View / API
-    participant DB as Database
-    participant C as Customer
-    A->>V: Add reply (public)
-    V->>DB: save Comment
-    alt public comment & not self
-        V->>C: SMTP email [Ticket #N]
-    else internal note
-        V-->>V: no email sent
-    end
-    C->>V: Email reply "[Ticket #12] ..."
-    V->>DB: append Comment, reopen if closed
-```
-
-## Project structure
-
-```
-Deskless/
-├── helpdesk/               # project config
-│   ├── settings.py         # env-driven; SQLite→Postgres, console→SMTP, allauth, SLA
-│   ├── urls.py             # web + /api/ + token + allauth (SSO) + media
-│   └── wsgi.py
-├── tickets/                # the app
-│   ├── models.py           # Ticket · Comment · OrgSettings · Webhook  ← the asset
-│   ├── views.py            # dashboard, queue, detail, reports, team, settings, intake
-│   ├── forms.py            # ticket / comment / close / link / org / new-user forms
-│   ├── api.py              # DRF ViewSets
-│   ├── serializers.py
-│   ├── signals.py          # AI triage · SLA due_at · webhooks · SSO auto-agent
-│   ├── notifications.py    # staff emails: new / assigned / breach
-│   ├── context_processors.py  # branding (DB→env) + SSO providers → templates
-│   ├── admin.py
-│   ├── management/commands/
-│   │   ├── fetch_email.py   # IMAP → tickets
-│   │   └── check_sla.py     # flag + email SLA breaches (cron)
-│   └── templates/
-├── Dockerfile
-├── docker-compose.yml      # web (gunicorn+whitenoise) + Postgres
-├── entrypoint.sh           # migrate + gunicorn
-├── requirements.txt
-├── .env.example            # all config
-└── LICENSE                 # MIT
-```
-
-## Local development
+Requires Python 3.12+.
 
 ```bash
+git clone https://github.com/akheels-web/Deskless.git
+cd Deskless
+
 python -m venv .venv
-.venv/Scripts/pip install -r requirements.txt   # Windows; use .venv/bin on Linux/Mac
-.venv/Scripts/python manage.py migrate
-.venv/Scripts/python manage.py createsuperuser
-.venv/Scripts/python manage.py runserver
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py createsuperuser
+python manage.py runserver
 ```
 
-| Route | What |
-|-------|------|
-| `/` | Dashboard (widgets) |
-| `/queue/` | Ticket queue with left-panel views |
-| `/t/<id>/` | Ticket detail — reply, assign, status, link, close |
-| `/new/` | Agent logs a ticket (phone/walk-in) |
-| `/reports/` | Reports |
-| `/team/` | Team & roles (admins) |
-| `/settings/` | Branding, logo, SLA targets, SSO (admins) |
-| `/submit/` | Public request form |
-| `/admin/` | Django admin |
+Open http://127.0.0.1:8000 for the customer portal, or sign in at
+`/accounts/login/` for the agent console. Defaults to SQLite and prints email
+to the console — no external services needed to try it.
+
+---
+
+## Key routes
+
+| Route | Description |
+|-------|-------------|
+| `/` | Customer portal (help center) |
+| `/kb/`, `/submit/`, `/track/` | Knowledge base, submit a request, track tickets |
+| `/status/<token>/` | Customer status page for a single ticket |
+| `/dashboard/` | Agent dashboard |
+| `/queue/`, `/t/<id>/` | Ticket queue and detail |
+| `/reports/`, `/team/`, `/customers/`, `/settings/` | Admin & reporting |
 | `/api/tickets/`, `/api/comments/` | REST API |
-| `POST /api/token/` | Get an API token |
+| `POST /api/token/` | Obtain an API token |
+| `/admin/` | Django admin |
 
-Defaults to SQLite and prints email to the console — no setup needed.
+---
 
-### Get an API token
-```bash
-curl -X POST http://127.0.0.1:8000/api/token/ -d "username=admin&password=yourpass"
-curl -H "Authorization: Token <key>" http://127.0.0.1:8000/api/tickets/
-```
+## Configuration
+
+Most settings are editable in-app under **Settings** (branding, SMTP, SLA,
+business hours, reopen window). Environment variables provide the deploy-time
+defaults — see [.env.example](.env.example).
+
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `SECRET_KEY` | Django crypto key | insecure dev key |
+| `DEBUG` | Debug mode | `True` |
+| `ALLOWED_HOSTS` | Comma-separated hostnames | `localhost,127.0.0.1` |
+| `CSRF_TRUSTED_ORIGINS` | Comma-separated `https://` origins | empty |
+| `DATABASE_URL` | Postgres connection URL | SQLite file |
+| `EMAIL_HOST` + `EMAIL_*` | Outbound SMTP fallback | console |
+| `IMAP_HOST` + `IMAP_*` | Inbound email-to-ticket | off |
+| `OPENAI_API_KEY` | Enable LLM triage | keyword triage |
+
+---
 
 ## Scheduled jobs
 
-Two management commands are meant to run on a schedule (cron / Task Scheduler):
+Run these on a schedule (cron, Task Scheduler, or your platform's scheduler):
 
 ```bash
 python manage.py fetch_email   # pull inbound email into tickets
-python manage.py check_sla     # flag overdue tickets and email breaches (every ~15 min)
+python manage.py check_sla     # flag overdue tickets and email breaches (~every 15 min)
 ```
 
-## Integrations
-
-- **REST API** — full CRUD on tickets & comments (token or session auth).
-- **Outbound webhooks** — add a `Webhook` (URL + event) in the admin. Deskless POSTs JSON on `ticket.created` and `ticket.closed`:
-  ```json
-  { "event": "ticket.closed",
-    "ticket": { "id": 42, "subject": "...", "status": "closed",
-                "priority": "high", "resolution": "...", "reporter": "user@x.com" } }
-  ```
-
-## Single sign-on (SSO)
-
-Google, Microsoft, and Zoho via [django-allauth](https://docs.allauth.org).
-
-1. Create an OAuth app in the provider's console (Google Cloud / Azure / Zoho).
-2. In Deskless: **Settings → Configure SSO provider** (Django admin → Social Applications), paste the Client ID & Secret, attach it to the site.
-3. Buttons appear on the login page automatically. SSO users are provisioned as agents.
-
-Set the redirect/callback URL in the provider to `https://<your-host>/accounts/<provider>/login/callback/`.
+---
 
 ## Deployment
 
-```mermaid
-graph LR
-    NET([Internet]) -->|HTTPS| PROXY[Reverse proxy<br/>nginx / traefik / Caddy<br/>TLS termination]
-    PROXY -->|:8000| WEB[web container<br/>gunicorn + whitenoise]
-    WEB --> PG[(db container<br/>Postgres 16)]
-    PG --- VOL[(pgdata volume)]
-    WEB --- MEDIA[(media volume<br/>uploaded logos)]
-```
+Runs as a container with Postgres via Docker Compose:
 
 ```bash
-cp .env.example .env   # set SECRET_KEY, ALLOWED_HOSTS, CSRF_TRUSTED_ORIGINS, DB_PASSWORD, email, branding
+cp .env.example .env           # set SECRET_KEY, ALLOWED_HOSTS, DB_PASSWORD, site URL, etc.
 docker compose up -d --build
 docker compose exec web python manage.py createsuperuser
 ```
 
-- `web` runs `migrate` then gunicorn; static served by whitenoise (no separate static host).
-- `db` is health-gated — `web` waits for Postgres to be ready.
-- Postgres and uploaded media (logos + attachments) each persist on a named volume across rebuilds.
-- **Put a reverse proxy with TLS in front** (port 8000 is plain HTTP). When `DEBUG=False`, the app enables HTTPS redirect, secure cookies, and HSTS, and trusts `X-Forwarded-Proto` from the proxy.
+Put a TLS-terminating reverse proxy (Caddy, nginx, Traefik) in front. Full
+production guide — proxy configs, backups, updates, SSO callbacks,
+troubleshooting — in **[DEPLOYMENT.md](DEPLOYMENT.md)**.
 
-**👉 Full step-by-step production guide: [DEPLOYMENT.md](DEPLOYMENT.md)** — reverse-proxy configs (Caddy/nginx), TLS, cron jobs, SSO callback setup, backups, updates, and troubleshooting.
+### Updating
 
-### Email-to-ticket
-Set `IMAP_*` in `.env`, then poll on a schedule:
 ```bash
-docker compose exec web python manage.py fetch_email
+git pull
+docker compose up -d --build   # migrations run automatically on start
 ```
-Replies with `[Ticket #N]` in the subject append to that ticket and reopen it; anything else becomes a new ticket.
 
-## Configuration
-
-All via environment — see [.env.example](.env.example). No env set = dev-safe defaults (SQLite, console email). Branding and SLA targets are also editable in-app under **Settings** (DB values override env).
-
-| Var | Purpose | Default |
-|-----|---------|---------|
-| `SECRET_KEY` | Django crypto key | insecure dev key |
-| `DEBUG` | Debug mode | `True` |
-| `ALLOWED_HOSTS` | Comma-separated hostnames | `localhost,127.0.0.1,testserver` |
-| `CSRF_TRUSTED_ORIGINS` | Comma-separated `https://` origins | empty |
-| `DATABASE_URL` | Postgres URL | SQLite file |
-| `BRAND_NAME` / `BRAND_COLOR` / `BRAND_ACCENT` | Fallback theming (Settings overrides) | Deskless / greys |
-| `EMAIL_HOST` + `EMAIL_*` | Outbound SMTP (blank = console) | console |
-| `IMAP_HOST` + `IMAP_*` | Inbound email-to-ticket (blank = off) | off |
-| `OPENAI_API_KEY` | Enable LLM triage (else keywords) | off |
-
-## Roadmap (next phase)
-
-Knowledge base / canned replies · categories & tags · attachments · audit log · business-hours-aware SLA · CSAT rating · bulk actions.
+---
 
 ## License
+
 MIT — see [LICENSE](LICENSE).
